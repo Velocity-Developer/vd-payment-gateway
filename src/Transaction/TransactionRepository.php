@@ -50,27 +50,51 @@ class TransactionRepository
             'updated_at' => $now,
         ];
 
-        $existing = $this->find($gateway, $invoice);
-        if ($existing) {
-            if ($existing->status === 'paid') {
-                return new \WP_Error('vdpg_already_paid', __('Invoice ini sudah lunas.', 'vd-payment-gateway'));
+        // Dua percobaan: bila baris berubah/dibuat proses lain di antara find() dan tulis, baca ulang sekali.
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $existing = $this->find($gateway, $invoice);
+            if ($existing) {
+                if ($existing->status === 'paid') {
+                    return new \WP_Error('vdpg_already_paid', __('Invoice ini sudah lunas.', 'vd-payment-gateway'));
+                }
+                if (self::owned_by_other($existing, $row['source'], $row['ref_id'])) {
+                    return self::invoice_taken_error();
+                }
+                // Tulis hanya bila pemilik & status baris masih sama dengan yang tadi dibaca (compare-and-set).
+                $updated = $wpdb->update($this->table(), $row + ['status' => 'pending'], [
+                    'id' => (int) $existing->id,
+                    'source' => (string) $existing->source,
+                    'ref_id' => (string) $existing->ref_id,
+                    'status' => (string) $existing->status,
+                ]);
+                if ($updated) {
+                    return (int) $existing->id;
+                }
+                // 0 baris bisa berarti nilainya sudah identik (MySQL menghitung baris yang berubah saja):
+                // berhasil bila baris kini memang milik kita dan masih pending.
+                $now_row = $updated === 0 ? $this->find($gateway, $invoice) : null;
+                if ($now_row && (int) $now_row->id === (int) $existing->id && $now_row->status === 'pending'
+                    && (string) $now_row->source === $row['source'] && (string) $now_row->ref_id === $row['ref_id']) {
+                    return (int) $existing->id;
+                }
+                continue;
             }
-            if (self::owned_by_other($existing, $row['source'], $row['ref_id'])) {
-                return self::invoice_taken_error();
-            }
-            $row['status'] = 'pending';
-            $wpdb->update($this->table(), $row, ['id' => (int) $existing->id]);
 
-            return (int) $existing->id;
+            // UNIQUE (gateway, invoice): insert gagal bila proses lain baru saja membuat baris yang sama.
+            $suppress = $wpdb->suppress_errors(true);
+            $inserted = $wpdb->insert($this->table(), $row + [
+                'gateway' => (string) $gateway,
+                'invoice' => (string) $invoice,
+                'status' => 'pending',
+                'created_at' => $now,
+            ]);
+            $wpdb->suppress_errors($suppress);
+            if ($inserted) {
+                return (int) $wpdb->insert_id;
+            }
         }
 
-        $row['gateway'] = (string) $gateway;
-        $row['invoice'] = (string) $invoice;
-        $row['status'] = 'pending';
-        $row['created_at'] = $now;
-        $wpdb->insert($this->table(), $row);
-
-        return (int) $wpdb->insert_id;
+        return self::invoice_taken_error();
     }
 
     /**
