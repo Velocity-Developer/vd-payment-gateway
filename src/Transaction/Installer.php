@@ -4,7 +4,7 @@ namespace VdPaymentGateway\Transaction;
 
 class Installer
 {
-    const DB_VERSION = '1';
+    const DB_VERSION = '2';
     const OPTION = 'vdpg_db_version';
 
     public static function table()
@@ -38,6 +38,7 @@ class Installer
             request_payload longtext NULL,
             response_payload longtext NULL,
             notification_payload longtext NULL,
+            note varchar(255) NOT NULL DEFAULT '',
             paid_at datetime NULL,
             created_at datetime NOT NULL,
             updated_at datetime NOT NULL,
@@ -50,6 +51,8 @@ class Installer
         dbDelta($sql);
 
         update_option(self::OPTION, self::DB_VERSION, false);
+
+        \VdPaymentGateway\Compat\DuitkuImporter::run();
     }
 
     public static function maybe_upgrade()

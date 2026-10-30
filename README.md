@@ -3,7 +3,7 @@
 Plugin payment gateway terpusat untuk plugin/theme Velocity Developer (vd-store, vd-marketplace, velocity-donasi, velocity-toko).
 Gateway ditulis sekali di sini; plugin lain cukup memanggil API di bawah.
 
-Gateway saat ini: **DOKU Checkout** (Non-SNAP). Duitku menyusul (tahap berikutnya).
+Gateway: **DOKU Checkout** (Non-SNAP) dan **Duitku Pop**.
 
 ## Pengaturan
 
@@ -12,7 +12,10 @@ Menu **Payment Gateway → DOKU** di wp-admin:
 - Aktifkan, Mode (Sandbox/Production), Client ID, Secret Key, batas bayar (menit).
 - Salin **Notification URL** (`/wp-json/vd-pg/v1/notify/doku`) ke DOKU Back Office → Integration → Notification.
 
-Tab **Transaksi** menampilkan riwayat dan tombol **Cek status** (memanggil Check Status API DOKU).
+Menu **Payment Gateway → Duitku**: Aktifkan, Mode, Kode Merchant, API Key, batas bayar, Return URL bawaan.
+Callback URL dikirim otomatis per transaksi (`/wp-json/vd-pg/v1/notify/duitku`), tidak perlu diisi di dashboard Duitku.
+
+Tab **Transaksi** menampilkan riwayat dan tombol **Cek status** (memanggil API cek status gateway).
 
 ## API untuk plugin lain
 
@@ -46,9 +49,35 @@ Dipicu **sekali** per perubahan status (notifikasi ganda diabaikan):
 
 Filter: `vd_pg_gateways` (daftarkan gateway baru, implementasi `GatewayInterface`), `vd_pg_doku_payment_body`.
 
+## Kompatibilitas Duitku lama (velocity-addons < 2.3)
+
+Duitku dihapus dari velocity-addons (commit `2a81d86`). Plugin ini menyediakan pengganti supaya vd-store, vd-marketplace,
+dan velocity-donasi versi sekarang langsung bisa memakai Duitku lagi tanpa rilis ulang:
+
+- Kelas `Velocity_Addons_Duitku` (`is_active()`, `options()`, `createInvoice($params)` → respons Duitku mentah, `get_by_invoice()`).
+  Dimuat lewat autoloader dan **hanya bila kelas aslinya tidak ada**, jadi aman dipasang bersama addons lama.
+- Shortcode `[tombol_bayar_duitku invoice="..."]` (Duitku Pop).
+- Endpoint lama `/wp-json/velocityaddons/v1/duitku_callback` tetap menerima callback invoice lama.
+- Action lama `velocity_duitku_callback($payload)` dipicu sekali per perubahan status (resultCode `00` = lunas).
+- Saat aktivasi, pengaturan `velocity_duitku_options` dan riwayat tabel `vd_duitku_invoice`/`vd_duitku_callback` diimpor sekali
+  (hasilnya di opsi `vdpg_duitku_imported`).
+
+## Catatan Duitku
+
+- Signature memakai HMAC-SHA256 (Duitku menyatakan MD5/SHA256 lama obsolete sejak Apr 2026). Callback dengan signature MD5 lama masih diterima.
+- `itemDetails.price` = harga satuan × qty; totalnya disamakan dengan `paymentAmount` seperti pada DOKU.
+
 ## Catatan DOKU
 
 - Signature request & notifikasi: HMAC-SHA256 atas `Client-Id`, `Request-Id`, `Request-Timestamp`, `Request-Target`, `Digest` (SHA-256 base64 body).
 - Status `FAILED` di DOKU Checkout diabaikan (pelanggan bisa ganti metode bayar), sesuai anjuran DOKU.
 - Status lunas/refund tidak bisa turun kembali ke pending/expired.
+- Status lunas ditetapkan dari notifikasi yang signature-nya valid dan nominalnya cocok; Check Status API tidak dipanggil otomatis
+  (DOKU menyarankan jeda 60 detik). Gunakan tombol **Cek status** atau `vd_pg_sync_status()` bila notifikasi tidak datang.
+- Nominal notifikasi yang tidak cocok diberi catatan merah di tab Transaksi.
 - Total `line_items` disamakan dengan `amount`: selisih (ongkir/biaya) jadi satu baris tambahan; bila ada diskon, `line_items` tidak dikirim.
+
+## Pengujian
+
+Skrip ujung-ke-ujung (mock DOKU & Duitku, aman dijalankan berulang) ada di luar repo pada server pengembangan:
+`/root/vdpg-test/scripts/e2e.php` → `wp eval-file e2e.php`.

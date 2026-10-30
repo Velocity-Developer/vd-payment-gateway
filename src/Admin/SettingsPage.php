@@ -236,7 +236,12 @@ class SettingsPage
                         <td><?php echo esc_html($row->gateway); ?></td>
                         <td><?php echo esc_html(trim($row->source . ' #' . $row->ref_id, ' #')); ?></td>
                         <td><?php echo esc_html(number_format_i18n((int) $row->amount)); ?></td>
-                        <td><strong><?php echo esc_html($row->status); ?></strong></td>
+                        <td>
+                            <strong><?php echo esc_html($row->status); ?></strong>
+                            <?php if (!empty($row->note)) : ?>
+                                <br><span style="color:<?php echo $row->source === 'legacy-import' ? '#646970' : '#b32d2e'; ?>"><?php echo esc_html($row->note); ?></span>
+                            <?php endif; ?>
+                        </td>
                         <td><?php echo esc_html($row->channel); ?></td>
                         <td><?php echo esc_html($row->created_at); ?></td>
                         <td><?php echo esc_html((string) $row->paid_at); ?></td>

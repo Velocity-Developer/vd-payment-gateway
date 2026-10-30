@@ -46,6 +46,7 @@ class TransactionRepository
             'payment_url' => (string) ($data['payment_url'] ?? ''),
             'request_payload' => isset($data['request']) ? wp_json_encode($data['request']) : null,
             'response_payload' => isset($data['response']) ? wp_json_encode($data['response']) : null,
+            'note' => '',
             'updated_at' => $now,
         ];
 
@@ -106,6 +107,16 @@ class TransactionRepository
         $affected = $wpdb->query($wpdb->prepare($sql, $values));
 
         return $affected === 1;
+    }
+
+    public function set_note($id, $note)
+    {
+        global $wpdb;
+
+        $wpdb->update($this->table(), [
+            'note' => mb_substr((string) $note, 0, 255),
+            'updated_at' => current_time('mysql', true),
+        ], ['id' => (int) $id]);
     }
 
     public function save_notification($id, $payload)

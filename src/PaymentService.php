@@ -23,18 +23,29 @@ class PaymentService
             return new \WP_Error('vdpg_unknown_gateway', __('Gateway tidak dikenal.', 'vd-payment-gateway'));
         }
 
+        return $this->create_payment_with($gateway->id(), $args, function () use ($gateway, $args) {
+            return $gateway->create_payment($args);
+        });
+    }
+
+    /**
+     * Cek invoice belum lunas, jalankan $creator (panggilan API gateway), lalu catat transaksinya.
+     * $args minimal berisi invoice, amount, source, ref_id.
+     */
+    public function create_payment_with($gateway_id, array $args, callable $creator)
+    {
         $invoice = trim((string) ($args['invoice'] ?? ''));
-        $existing = $invoice !== '' ? $this->transactions->find($gateway->id(), $invoice) : null;
+        $existing = $invoice !== '' ? $this->transactions->find($gateway_id, $invoice) : null;
         if ($existing && $existing->status === 'paid') {
             return new \WP_Error('vdpg_already_paid', __('Invoice ini sudah lunas.', 'vd-payment-gateway'));
         }
 
-        $result = $gateway->create_payment($args);
+        $result = $creator();
         if (is_wp_error($result)) {
             return $result;
         }
 
-        $saved = $this->transactions->upsert_pending($gateway->id(), $invoice, [
+        $saved = $this->transactions->upsert_pending($gateway_id, $invoice, [
             'source' => sanitize_key((string) ($args['source'] ?? '')),
             'ref_id' => (string) ($args['ref_id'] ?? ''),
             'amount' => (int) round((float) ($args['amount'] ?? 0)),
@@ -68,7 +79,12 @@ class PaymentService
 
         $status = (string) ($normalized['status'] ?? 'pending');
         if ($status === 'paid' && (int) $normalized['amount'] !== (int) $transaction->amount) {
-            // Nominal tidak cocok: jangan tandai lunas, biarkan admin memeriksa.
+            // Nominal tidak cocok: jangan tandai lunas, beri catatan untuk admin.
+            $this->transactions->set_note($transaction->id, sprintf(
+                __('Nominal tidak cocok: notifikasi %1$s, tagihan %2$s. Periksa di dashboard gateway.', 'vd-payment-gateway'),
+                number_format_i18n((int) $normalized['amount']),
+                number_format_i18n((int) $transaction->amount)
+            ));
             do_action('vd_pg_payment_amount_mismatch', $transaction, $normalized);
 
             return new \WP_Error('vdpg_amount_mismatch', 'Nominal tidak cocok', ['status' => 200]);

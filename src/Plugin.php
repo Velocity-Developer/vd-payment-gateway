@@ -3,6 +3,7 @@
 namespace VdPaymentGateway;
 
 use VdPaymentGateway\Admin\SettingsPage;
+use VdPaymentGateway\Compat\LegacyDuitku;
 use VdPaymentGateway\Gateway\Registry;
 use VdPaymentGateway\Rest\NotificationController;
 use VdPaymentGateway\Transaction\Installer;
@@ -25,6 +26,7 @@ class Plugin
     public function boot()
     {
         Installer::maybe_upgrade();
+        LegacyDuitku::boot();
 
         add_action('rest_api_init', [new NotificationController(), 'register']);
 
