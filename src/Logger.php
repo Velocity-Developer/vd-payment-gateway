@@ -106,10 +106,13 @@ class Logger
     /** Parameter URL berisi token akses (mis. ?t= di link pesanan velocity-toko), selain nama sensitif di SENSITIVE. */
     const URL_SECRET_PARAMS = ['t', 'k', 'key', 'sig', 'hash', 'auth', 'code'];
 
-    /** Nilai parameter rahasia di query URL (callback_url, return_url) diganti ***; parameter lain tetap. */
+    /**
+     * Nilai parameter rahasia di query URL (callback_url, return_url) diganti ***; parameter lain tetap.
+     * Pemisah juga dikenali dalam bentuk HTML (&amp;) dan JSON (\u0026) untuk URL di dalam teks bebas.
+     */
     public static function mask_url_query($url)
     {
-        return preg_replace_callback('/([?&])([^=&#]+)=([^&#]*)/', function ($m) {
+        return preg_replace_callback('/(\?|&amp;|&|\\\\u0026)([^=&#\s"\'<>\\\\]+)=([^&#\s"\'<>\\\\]*)/', function ($m) {
             $name = strtolower(rawurldecode($m[2]));
             $secret = $m[3] !== '' && (in_array($name, self::URL_SECRET_PARAMS, true) || self::is_sensitive($name));
 
@@ -226,6 +229,10 @@ class Logger
     /** Samarkan alamat email dan nomor HP Indonesia (08…, 628…, +628…) di dalam teks bebas. */
     public static function scrub($text)
     {
+        // URL di dalam teks bebas (respons mentah, pesan error), termasuk bentuk JSON https:\/\/...
+        $text = preg_replace_callback('#https?:(?://|\\\\/\\\\/)[^\s"\'<>]+#i', function ($m) {
+            return self::mask_url_query($m[0]);
+        }, (string) $text);
         $text = preg_replace_callback('/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/', function ($m) {
             return self::mask_pii('email', $m[0]);
         }, (string) $text);
