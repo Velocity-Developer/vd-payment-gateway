@@ -92,6 +92,10 @@ class TransactionRepository
             if ($inserted) {
                 return (int) $wpdb->insert_id;
             }
+            // Gagal bukan karena baris kembar (UNIQUE): jangan dilaporkan sebagai invoice dipakai.
+            if (!$this->find($gateway, $invoice)) {
+                return new \WP_Error('vdpg_db_error', __('Transaksi gagal disimpan. Silakan coba lagi.', 'vd-payment-gateway'), ['status' => 500]);
+            }
         }
 
         return self::invoice_taken_error();
