@@ -24,6 +24,7 @@ class NotificationController
     {
         $gateway_id = sanitize_key((string) $request->get_param('gateway'));
         $log = [
+            'ip' => $this->log_ip($request),
             'headers' => $this->log_headers($request),
             'body' => json_decode((string) $request->get_body(), true) ?: ($request->get_body_params() ?: mb_substr((string) $request->get_body(), 0, 1000)),
         ];
@@ -51,12 +52,29 @@ class NotificationController
         return new \WP_REST_Response(['message' => 'OK'], 200);
     }
 
+    /** Hanya dicatat untuk analisis; tidak dipakai untuk menerima/menolak notifikasi. */
+    private function log_ip(\WP_REST_Request $request)
+    {
+        if (!Logger::enabled()) {
+            return [];
+        }
+        $ip = ['remote_addr' => isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : ''];
+        foreach (['x_forwarded_for', 'x_real_ip', 'cf_connecting_ip'] as $name) {
+            $value = $request->get_header($name);
+            if ($value !== null && $value !== '') {
+                $ip[$name] = sanitize_text_field($value);
+            }
+        }
+
+        return $ip;
+    }
+
     private function log_headers(\WP_REST_Request $request)
     {
         if (!Logger::enabled()) {
             return [];
         }
-        $keep = ['client_id', 'request_id', 'request_timestamp', 'signature', 'content_type', 'user_agent', 'x_forwarded_for'];
+        $keep = ['client_id', 'request_id', 'request_timestamp', 'signature', 'content_type', 'user_agent'];
         $headers = [];
         foreach ($keep as $name) {
             $value = $request->get_header($name);

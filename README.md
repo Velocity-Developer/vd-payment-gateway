@@ -85,7 +85,9 @@ Tab **Payment Gateway › Log** (mati secara bawaan, opsi `vdpg_debug_log`). Isi
 - `notify.<gateway>`: notifikasi masuk (header, body, hasil cek signature, status akhir, kode HTTP balasan).
 - `status.changed` / `status.amount_mismatch`: perubahan status transaksi atau nominal yang tidak cocok.
 
-Secret key, signature, token, dan password disamarkan (4 karakter awal…4 akhir). Berkas harian
+Secret key, signature, token, dan password disamarkan (4 karakter awal…4 akhir). Data pelanggan juga disamarkan:
+email `bu***@example.com`, HP `6281****6789`, nama `B*** S***`, alamat `Jl.***`. Notifikasi mencatat IP pengirim
+(`remote_addr`, `x_forwarded_for`, `x_real_ip`, `cf_connecting_ip`) hanya untuk analisis, tidak dipakai untuk menolak notifikasi. Berkas harian
 `wp-content/uploads/vdpg-logs/vdpg-YYYY-MM-DD-<hash>.log`, otomatis dihapus setelah 14 hari.
 Nama berkas memakai hash acak per situs. Bila perlu, pindahkan foldernya ke luar folder publik lewat filter `vdpg_log_dir`.
 

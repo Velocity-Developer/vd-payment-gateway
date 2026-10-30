@@ -38,18 +38,22 @@ class Logger
         self::cleanup();
     }
 
-    public static function mask($data, $key = '')
+    /** Kunci data pelanggan (dibandingkan tanpa "_"/"-", huruf kecil). "name" hanya di dalam blok pelanggan. */
+    const PII = ['email', 'phone', 'phonenumber', 'mobilephone', 'customervaname', 'firstname', 'lastname', 'fullname', 'address', 'merchantuserinfo'];
+    const PII_PARENTS = ['customer', 'customerdetail', 'billingaddress', 'shippingaddress'];
+
+    public static function mask($data, $key = '', $parent = '')
     {
+        if (is_object($data)) {
+            $data = get_object_vars($data);
+        }
         if (is_array($data)) {
             $out = [];
             foreach ($data as $k => $v) {
-                $out[$k] = self::mask($v, (string) $k);
+                $out[$k] = self::mask($v, (string) $k, (string) $key);
             }
 
             return $out;
-        }
-        if (is_object($data)) {
-            return self::mask(get_object_vars($data), $key);
         }
 
         $k = strtolower(str_replace('-', '_', $key));
@@ -61,7 +65,35 @@ class Logger
             }
         }
 
+        $plain = str_replace('_', '', $k);
+        $plain_parent = strtolower(str_replace(['_', '-'], '', $parent));
+        if (is_string($data) && $data !== '' && (in_array($plain, self::PII, true) || ($plain === 'name' && in_array($plain_parent, self::PII_PARENTS, true)))) {
+            return self::mask_pii($plain, $data);
+        }
+
         return $data;
+    }
+
+    /** bu***@example.com, 6281****6789, B*** S***, Jl.*** */
+    public static function mask_pii($type, $value)
+    {
+        if (strpos($value, '@') !== false) {
+            [$user, $domain] = explode('@', $value, 2);
+
+            return mb_substr($user, 0, 2) . '***@' . $domain;
+        }
+        if (strpos($type, 'phone') !== false) {
+            $digits = preg_replace('/\D+/', '', $value);
+
+            return strlen($digits) > 8 ? substr($digits, 0, 4) . str_repeat('*', strlen($digits) - 8) . substr($digits, -4) : '***';
+        }
+        if ($type === 'address') {
+            return mb_substr($value, 0, 3) . '***';
+        }
+
+        return implode(' ', array_map(function ($word) {
+            return mb_substr($word, 0, 1) . '***';
+        }, preg_split('/\s+/', trim($value))));
     }
 
     public static function dir()
