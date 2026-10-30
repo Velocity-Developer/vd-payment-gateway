@@ -3,6 +3,7 @@
 namespace VdPaymentGateway\Gateway\Duitku;
 
 use VdPaymentGateway\Gateway\GatewayInterface;
+use VdPaymentGateway\Logger;
 
 /**
  * Duitku Pop (createInvoice) + HTTP callback + cek status.
@@ -212,7 +213,7 @@ class DuitkuGateway implements GatewayInterface
             'timeout' => 20,
         ]);
 
-        $result = $this->decode_response($response);
+        $result = $this->decode_response($response, 'invoice', $params);
         if (is_wp_error($result)) {
             return $result;
         }
@@ -275,7 +276,7 @@ class DuitkuGateway implements GatewayInterface
             'timeout' => 20,
         ]);
 
-        $result = $this->decode_response($response);
+        $result = $this->decode_response($response, 'status', ['merchantOrderId' => (string) $invoice]);
         if (is_wp_error($result)) {
             return $result;
         }
@@ -338,15 +339,19 @@ class DuitkuGateway implements GatewayInterface
         ];
     }
 
-    private function decode_response($response)
+    private function decode_response($response, $action = '', array $request = [])
     {
+        $log = ['mode' => $this->is_sandbox() ? 'sandbox' : 'production', 'action' => $action, 'body' => $request];
         if (is_wp_error($response)) {
+            Logger::log('duitku.request', $log + ['error' => $response->get_error_message()]);
+
             return new \WP_Error('vdpg_duitku_http', sprintf(__('Gagal menghubungi Duitku: %s', 'vd-payment-gateway'), $response->get_error_message()));
         }
 
         $code = (int) wp_remote_retrieve_response_code($response);
         $raw = (string) wp_remote_retrieve_body($response);
         $data = json_decode($raw, true);
+        Logger::log('duitku.request', $log + ['http' => $code, 'response' => is_array($data) ? $data : mb_substr($raw, 0, 1000)]);
 
         if ($code !== 200 || !is_array($data)) {
             $message = is_array($data) ? (string) ($data['Message'] ?? ($data['statusMessage'] ?? '')) : '';

@@ -86,6 +86,7 @@ class PaymentService
                 number_format_i18n((int) $transaction->amount)
             ));
             do_action('vd_pg_payment_amount_mismatch', $transaction, $normalized);
+            Logger::log('status.amount_mismatch', ['gateway' => $gateway_id, 'invoice' => $transaction->invoice, 'notified' => (int) $normalized['amount'], 'billed' => (int) $transaction->amount]);
 
             return new \WP_Error('vdpg_amount_mismatch', 'Nominal tidak cocok', ['status' => 200]);
         }
@@ -103,6 +104,14 @@ class PaymentService
 
         $transaction = $this->transactions->find_by_id($transaction->id);
         $payload = $normalized['raw'] ?? [];
+        Logger::log('status.changed', [
+            'gateway' => $gateway_id,
+            'invoice' => $transaction->invoice,
+            'status' => $status,
+            'source' => $transaction->source,
+            'ref_id' => $transaction->ref_id,
+            'amount' => (int) $transaction->amount,
+        ]);
 
         do_action('vd_pg_payment_status_changed', $transaction, $status, $payload);
         do_action("vd_pg_payment_{$status}", $transaction, $payload);

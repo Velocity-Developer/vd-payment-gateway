@@ -2,6 +2,7 @@
 
 namespace VdPaymentGateway\Admin;
 
+use VdPaymentGateway\Logger;
 use VdPaymentGateway\PaymentService;
 use VdPaymentGateway\Plugin;
 use VdPaymentGateway\Transaction\TransactionRepository;
@@ -16,6 +17,7 @@ class SettingsPage
         add_action('admin_menu', [$this, 'menu']);
         add_action('admin_post_vdpg_save', [$this, 'save']);
         add_action('admin_post_vdpg_sync', [$this, 'sync']);
+        add_action('admin_post_vdpg_log', [$this, 'save_log']);
     }
 
     public function menu()
@@ -44,7 +46,7 @@ class SettingsPage
 
         $gateways = Plugin::instance()->registry()->all();
         $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : '';
-        if ($tab === '' || ($tab !== 'transactions' && !isset($gateways[$tab]))) {
+        if ($tab === '' || (!in_array($tab, ['transactions', 'log'], true) && !isset($gateways[$tab]))) {
             $tab = (string) key($gateways);
         }
         ?>
@@ -60,10 +62,15 @@ class SettingsPage
                 <a href="<?php echo esc_url($this->url('transactions')); ?>" class="nav-tab <?php echo $tab === 'transactions' ? 'nav-tab-active' : ''; ?>">
                     <?php esc_html_e('Transaksi', 'vd-payment-gateway'); ?>
                 </a>
+                <a href="<?php echo esc_url($this->url('log')); ?>" class="nav-tab <?php echo $tab === 'log' ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e('Log', 'vd-payment-gateway'); ?>
+                </a>
             </nav>
             <?php
             if ($tab === 'transactions') {
                 $this->render_transactions();
+            } elseif ($tab === 'log') {
+                $this->render_log();
             } elseif (isset($gateways[$tab])) {
                 $this->render_gateway($gateways[$tab]);
             }
@@ -204,6 +211,52 @@ class SettingsPage
 
         wp_safe_redirect($this->url('transactions', $args));
         exit;
+    }
+
+    public function save_log()
+    {
+        if (!current_user_can(self::CAPABILITY)) {
+            wp_die(esc_html__('Tidak diizinkan.', 'vd-payment-gateway'));
+        }
+        check_admin_referer('vdpg_log');
+
+        if (isset($_POST['clear'])) {
+            Logger::clear();
+            $message = __('Log dihapus.', 'vd-payment-gateway');
+        } else {
+            update_option(Logger::OPTION, isset($_POST['enabled']) && $_POST['enabled'] === '1' ? '1' : '0', false);
+            $message = __('Pengaturan log disimpan.', 'vd-payment-gateway');
+        }
+
+        wp_safe_redirect($this->url('log', ['vdpg_msg' => $message]));
+        exit;
+    }
+
+    private function render_log()
+    {
+        $lines = Logger::tail(200);
+        ?>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <input type="hidden" name="action" value="vdpg_log">
+            <?php wp_nonce_field('vdpg_log'); ?>
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th scope="row"><label for="vdpg_log_enabled"><?php esc_html_e('Log debug', 'vd-payment-gateway'); ?></label></th>
+                    <td>
+                        <input type="checkbox" id="vdpg_log_enabled" name="enabled" value="1" <?php checked(Logger::enabled()); ?>>
+                        <?php esc_html_e('Catat permintaan ke API gateway, notifikasi masuk, dan perubahan status.', 'vd-payment-gateway'); ?>
+                        <p class="description"><?php printf(esc_html__('Secret key dan signature disamarkan. Berkas disimpan %d hari di uploads/vdpg-logs/. Matikan lagi setelah selesai pengecekan.', 'vd-payment-gateway'), Logger::LOG_DAYS); ?></p>
+                    </td>
+                </tr>
+            </table>
+            <p>
+                <?php submit_button(__('Simpan', 'vd-payment-gateway'), 'primary', 'submit', false); ?>
+                <?php submit_button(__('Hapus semua log', 'vd-payment-gateway'), 'delete', 'clear', false, ['onclick' => "return confirm('Hapus semua log?');"]); ?>
+            </p>
+        </form>
+        <h2><?php printf(esc_html__('%d baris terakhir', 'vd-payment-gateway'), count($lines)); ?></h2>
+        <textarea readonly class="large-text code" rows="25" style="white-space:pre;font-size:12px"><?php echo esc_textarea(implode("\n", $lines)); ?></textarea>
+        <?php
     }
 
     private function render_transactions()

@@ -3,6 +3,7 @@
 namespace VdPaymentGateway\Gateway\Doku;
 
 use VdPaymentGateway\Gateway\GatewayInterface;
+use VdPaymentGateway\Logger;
 
 /**
  * DOKU Checkout (Non-SNAP).
@@ -390,6 +391,7 @@ class DokuGateway implements GatewayInterface
             $headers['Content-Type'] = 'application/json';
         }
 
+        $started = microtime(true);
         $response = wp_remote_request($this->base_url() . $path, [
             'method' => $method,
             'headers' => $headers,
@@ -397,13 +399,24 @@ class DokuGateway implements GatewayInterface
             'timeout' => 20,
         ]);
 
+        $log = [
+            'mode' => $options['mode'],
+            'method' => $method,
+            'path' => $path,
+            'headers' => $headers,
+            'body' => $body,
+            'ms' => (int) round((microtime(true) - $started) * 1000),
+        ];
         if (is_wp_error($response)) {
+            Logger::log('doku.request', $log + ['error' => $response->get_error_message()]);
+
             return new \WP_Error('vdpg_doku_http', sprintf(__('Gagal menghubungi DOKU: %s', 'vd-payment-gateway'), $response->get_error_message()));
         }
 
         $code = (int) wp_remote_retrieve_response_code($response);
         $raw = (string) wp_remote_retrieve_body($response);
         $data = json_decode($raw, true, 512, JSON_BIGINT_AS_STRING);
+        Logger::log('doku.request', $log + ['http' => $code, 'response' => is_array($data) ? $data : mb_substr($raw, 0, 1000)]);
 
         if ($code < 200 || $code >= 300 || !is_array($data)) {
             $messages = is_array($data) ? ($data['error_messages'] ?? ($data['message'] ?? $data['error']['message'] ?? '')) : '';

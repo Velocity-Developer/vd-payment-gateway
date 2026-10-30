@@ -77,6 +77,18 @@ dan velocity-donasi versi sekarang langsung bisa memakai Duitku lagi tanpa rilis
 - Nominal notifikasi yang tidak cocok diberi catatan merah di tab Transaksi.
 - Total `line_items` disamakan dengan `amount`: selisih (ongkir/biaya) jadi satu baris tambahan; bila ada diskon, `line_items` tidak dikirim.
 
+## Log debug
+
+Tab **Payment Gateway › Log** (mati secara bawaan, opsi `vdpg_debug_log`). Isinya per baris (JSON, waktu UTC):
+
+- `doku.request` / `duitku.request`: permintaan ke API gateway, kode HTTP, waktu respons, dan isi responsnya.
+- `notify.<gateway>`: notifikasi masuk (header, body, hasil cek signature, status akhir, kode HTTP balasan).
+- `status.changed` / `status.amount_mismatch`: perubahan status transaksi atau nominal yang tidak cocok.
+
+Secret key, signature, token, dan password disamarkan (4 karakter awal…4 akhir). Berkas harian
+`wp-content/uploads/vdpg-logs/vdpg-YYYY-MM-DD-<hash>.log`, otomatis dihapus setelah 14 hari.
+Nama berkas memakai hash acak per situs. Bila perlu, pindahkan foldernya ke luar folder publik lewat filter `vdpg_log_dir`.
+
 ## Pengujian
 
 Skrip ujung-ke-ujung (mock DOKU & Duitku, aman dijalankan berulang) ada di luar repo pada server pengembangan:
