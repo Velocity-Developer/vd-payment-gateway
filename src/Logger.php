@@ -96,8 +96,25 @@ class Logger
         if (is_string($data) && in_array($plain, self::FREE_TEXT, true)) {
             return self::scrub($data);
         }
+        if (is_string($data) && strpos($data, '?') !== false && preg_match('#^https?://#i', $data)) {
+            return self::mask_url_query($data);
+        }
 
         return $data;
+    }
+
+    /** Parameter URL berisi token akses (mis. ?t= di link pesanan velocity-toko), selain nama sensitif di SENSITIVE. */
+    const URL_SECRET_PARAMS = ['t', 'k', 'key', 'sig', 'hash', 'auth', 'code'];
+
+    /** Nilai parameter rahasia di query URL (callback_url, return_url) diganti ***; parameter lain tetap. */
+    public static function mask_url_query($url)
+    {
+        return preg_replace_callback('/([?&])([^=&#]+)=([^&#]*)/', function ($m) {
+            $name = strtolower(rawurldecode($m[2]));
+            $secret = $m[3] !== '' && (in_array($name, self::URL_SECRET_PARAMS, true) || self::is_sensitive($name));
+
+            return $m[1] . $m[2] . '=' . ($secret ? '***' : $m[3]);
+        }, $url);
     }
 
     private static function normalize_key($key)
