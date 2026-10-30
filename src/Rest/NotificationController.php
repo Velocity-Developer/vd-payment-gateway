@@ -95,7 +95,7 @@ class NotificationController
     {
         $data = $error->get_error_data();
         $status = is_array($data) && isset($data['status']) ? (int) $data['status'] : 400;
-        Logger::log('notify.' . $gateway_id, $log + ['result' => $error->get_error_code() . ': ' . $error->get_error_message(), 'http' => $status]);
+        Logger::log('notify.' . $gateway_id, $log + ['result' => Logger::scrub($error->get_error_code() . ': ' . $error->get_error_message()), 'http' => $status]);
 
         return new \WP_REST_Response(['message' => $error->get_error_message()], $status);
     }

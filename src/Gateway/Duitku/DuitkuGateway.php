@@ -343,7 +343,7 @@ class DuitkuGateway implements GatewayInterface
     {
         $log = ['mode' => $this->is_sandbox() ? 'sandbox' : 'production', 'action' => $action, 'body' => $request];
         if (is_wp_error($response)) {
-            Logger::log('duitku.request', $log + ['error' => $response->get_error_message()]);
+            Logger::log('duitku.request', $log + ['error' => Logger::scrub($response->get_error_message())]);
 
             return new \WP_Error('vdpg_duitku_http', sprintf(__('Gagal menghubungi Duitku: %s', 'vd-payment-gateway'), $response->get_error_message()));
         }

@@ -11,7 +11,10 @@ class Logger
 {
     const OPTION = 'vdpg_debug_log';
     const LOG_DAYS = 14;
-    const SENSITIVE = ['secret', 'signature', 'password', 'api_key', 'apikey', 'merchantkey', 'merchant_key', 'authorization', 'token'];
+    /** Dicocokkan per segmen kata kunci (snake/kebab/camelCase), bukan substring bebas: lihat is_sensitive(). */
+    const SENSITIVE = ['secret', 'signature', 'password', 'apikey', 'merchantkey', 'authorization', 'token'];
+    /** Kunci berakhiran ini berisi keterangan, bukan datanya: authorizationStatus, tokenCount, addressType. */
+    const META_SUFFIXES = ['status', 'type', 'count', 'length', 'verified', 'enabled', 'required', 'format'];
 
     public static function enabled()
     {
@@ -46,7 +49,7 @@ class Logger
      */
     const PII_CONTAINS = ['email' => 'email', 'phone' => 'phone', 'mobile' => 'phone', 'msisdn' => 'phone', 'address' => 'address'];
     const PII_EXACT = ['merchantuserinfo' => 'name', 'merchantuserid' => 'id'];
-    const PII_NAME_PREFIXES = ['customer', 'customerva', 'payer', 'buyer', 'first', 'last', 'full', 'middle', 'billing', 'shipping', 'recipient', 'receiver', 'account', 'holder', 'user'];
+    const PII_NAME_PREFIXES = ['customer', 'customerva', 'virtualaccount', 'va', 'cardholder', 'sender', 'contact', 'payer', 'buyer', 'first', 'last', 'full', 'middle', 'billing', 'shipping', 'recipient', 'receiver', 'account', 'holder', 'user'];
     const PII_PARENTS = ['customer', 'payer', 'buyer', 'billing', 'shipping', 'recipient', 'receiver'];
     /** Kunci teks bebas yang bisa memuat email/nomor HP pelanggan; isinya disaring dengan regex. */
     const FREE_TEXT = ['additionalparam', 'productdetail', 'productdetails', 'description', 'note', 'remarks'];
@@ -65,7 +68,7 @@ class Logger
         $plain = self::normalize_key($key);
         $parents = (array) $parents;
 
-        $type = $inherit === 'secret' || self::is_sensitive($plain) ? 'secret' : (self::pii_type($plain, $parents) ?: $inherit);
+        $type = $inherit === 'secret' || self::is_sensitive($key) ? 'secret' : (self::pii_type($plain, $parents) ?: $inherit);
 
         if (is_array($data)) {
             $out = [];
@@ -99,14 +102,39 @@ class Logger
         return strtolower(str_replace(['_', '-', ' '], '', (string) $key));
     }
 
-    private static function is_sensitive($plain)
+    private static function is_meta($plain)
     {
-        if ($plain === '') {
+        foreach (self::META_SUFFIXES as $suffix) {
+            if ($plain !== $suffix && substr($plain, -strlen($suffix)) === $suffix) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Rahasia bila salah satu segmen (atau dua segmen berurutan, mis. api+key) sama dengan / berakhiran kata di SENSITIVE,
+     * atau berupa kata itu + key/id (secretkey). Jadi access_token, x-signature, clientSecret, apikey kena;
+     * tokenizer, secretary, authorizationStatus, tokenCount tidak.
+     */
+    private static function is_sensitive($key)
+    {
+        $plain = self::normalize_key($key);
+        if ($plain === '' || is_numeric($plain) || self::is_meta($plain)) {
             return false;
         }
-        foreach (self::SENSITIVE as $needle) {
-            if (strpos($plain, str_replace('_', '', $needle)) !== false) {
-                return true;
+        $segments = array_values(array_filter(array_map('strtolower', preg_split('/[_\-\s.]+|(?<=[a-z0-9])(?=[A-Z])/', (string) $key))));
+        $words = $segments;
+        for ($i = 1; $i < count($segments); $i++) {
+            $words[] = $segments[$i - 1] . $segments[$i];
+        }
+        foreach ($words as $word) {
+            foreach (self::SENSITIVE as $needle) {
+                if ($word === $needle || substr($word, -strlen($needle)) === $needle
+                    || (strpos($word, $needle) === 0 && in_array(substr($word, strlen($needle)), ['key', 'id'], true))) {
+                    return true;
+                }
             }
         }
 
@@ -116,7 +144,7 @@ class Logger
     /** @return string tipe penyamaran, atau '' bila bukan data pelanggan */
     private static function pii_type($plain, array $parents)
     {
-        if ($plain === '' || is_numeric($plain)) {
+        if ($plain === '' || is_numeric($plain) || self::is_meta($plain)) {
             return '';
         }
         if (isset(self::PII_EXACT[$plain])) {

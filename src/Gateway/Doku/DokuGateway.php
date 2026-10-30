@@ -408,7 +408,7 @@ class DokuGateway implements GatewayInterface
             'ms' => (int) round((microtime(true) - $started) * 1000),
         ];
         if (is_wp_error($response)) {
-            Logger::log('doku.request', $log + ['error' => $response->get_error_message()]);
+            Logger::log('doku.request', $log + ['error' => Logger::scrub($response->get_error_message())]);
 
             return new \WP_Error('vdpg_doku_http', sprintf(__('Gagal menghubungi DOKU: %s', 'vd-payment-gateway'), $response->get_error_message()));
         }
