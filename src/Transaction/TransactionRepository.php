@@ -55,6 +55,9 @@ class TransactionRepository
             if ($existing->status === 'paid') {
                 return new \WP_Error('vdpg_already_paid', __('Invoice ini sudah lunas.', 'vd-payment-gateway'));
             }
+            if (self::owned_by_other($existing, $row['source'], $row['ref_id'])) {
+                return self::invoice_taken_error();
+            }
             $row['status'] = 'pending';
             $wpdb->update($this->table(), $row, ['id' => (int) $existing->id]);
 
@@ -68,6 +71,28 @@ class TransactionRepository
         $wpdb->insert($this->table(), $row);
 
         return (int) $wpdb->insert_id;
+    }
+
+    /**
+     * Invoice sudah dipakai sumber/data lain (mis. pesanan vd-store vs donasi): jangan ditimpa, karena
+     * notifikasi berikutnya akan diteruskan ke pemilik yang salah. Baris hasil impor Duitku lama boleh diambil alih.
+     */
+    public static function owned_by_other($existing, $source, $ref_id)
+    {
+        $source = sanitize_key((string) $source);
+        if ((string) $existing->source === '' || $existing->source === 'legacy-import') {
+            return false;
+        }
+        if ($existing->source !== $source) {
+            return true;
+        }
+
+        return (string) $existing->ref_id !== '' && (string) $ref_id !== '' && (string) $existing->ref_id !== (string) $ref_id;
+    }
+
+    public static function invoice_taken_error()
+    {
+        return new \WP_Error('vdpg_invoice_taken', __('Nomor invoice ini sudah dipakai transaksi lain.', 'vd-payment-gateway'), ['status' => 409]);
     }
 
     /**

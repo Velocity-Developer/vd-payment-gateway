@@ -39,6 +39,10 @@ class PaymentService
         if ($existing && $existing->status === 'paid') {
             return new \WP_Error('vdpg_already_paid', __('Invoice ini sudah lunas.', 'vd-payment-gateway'));
         }
+        // Dicek sebelum memanggil API gateway supaya link baru tidak dibuat untuk invoice milik transaksi lain.
+        if ($existing && TransactionRepository::owned_by_other($existing, $args['source'] ?? '', $args['ref_id'] ?? '')) {
+            return TransactionRepository::invoice_taken_error();
+        }
 
         $result = $creator();
         if (is_wp_error($result)) {
