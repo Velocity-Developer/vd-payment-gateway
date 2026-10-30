@@ -12,7 +12,10 @@ class Logger
     const OPTION = 'vdpg_debug_log';
     const LOG_DAYS = 14;
     /** Dicocokkan per segmen kata kunci (snake/kebab/camelCase), bukan substring bebas: lihat is_sensitive(). */
-    const SENSITIVE = ['secret', 'signature', 'password', 'apikey', 'merchantkey', 'authorization', 'token'];
+    const SENSITIVE = ['secret', 'signature', 'password', 'apikey', 'merchantkey', 'authorization', 'token', 'privatekey', 'serverkey', 'clientkey',
+        'sharedkey', 'encryptionkey', 'sessionkey', 'passwd', 'pwd', 'pin', 'otp', 'cvv', 'cardnumber', 'hmac'];
+    /** Akhiran setelah kata sensitif dalam satu segmen tanpa pemisah: secretkey, tokenvalue, passwordhash, tokens, password1. */
+    const SENSITIVE_TAILS = ['key', 'id', 'value', 'hash', 'code', 'string', 'sha', 'header', 'base64', 'confirm', 'confirmation', 's', 'keys', 'ids', 'values'];
     /** Kunci berakhiran ini berisi keterangan, bukan datanya: authorizationStatus, tokenCount, addressType. */
     const META_SUFFIXES = ['status', 'type', 'count', 'length', 'verified', 'enabled', 'required', 'format'];
 
@@ -68,7 +71,7 @@ class Logger
         $plain = self::normalize_key($key);
         $parents = (array) $parents;
 
-        $type = $inherit === 'secret' || self::is_sensitive($key) ? 'secret' : (self::pii_type($plain, $parents) ?: $inherit);
+        $type = $inherit === 'secret' || self::is_sensitive($key, is_array($data)) ? 'secret' : (self::pii_type($plain, $parents) ?: $inherit);
 
         if (is_array($data)) {
             $out = [];
@@ -118,10 +121,11 @@ class Logger
      * atau berupa kata itu + key/id (secretkey). Jadi access_token, x-signature, clientSecret, apikey kena;
      * tokenizer, secretary, authorizationStatus, tokenCount tidak.
      */
-    private static function is_sensitive($key)
+    private static function is_sensitive($key, $is_container = false)
     {
         $plain = self::normalize_key($key);
-        if ($plain === '' || is_numeric($plain) || self::is_meta($plain)) {
+        // Kunci keterangan (tokenStatus) hanya dibiarkan bila nilainya skalar; isi array-nya tetap diperiksa sebagai rahasia.
+        if ($plain === '' || is_numeric($plain) || (!$is_container && self::is_meta($plain))) {
             return false;
         }
         $segments = array_values(array_filter(array_map('strtolower', preg_split('/[_\-\s.]+|(?<=[a-z0-9])(?=[A-Z])/', (string) $key))));
@@ -131,14 +135,19 @@ class Logger
         }
         foreach ($words as $word) {
             foreach (self::SENSITIVE as $needle) {
-                if ($word === $needle || substr($word, -strlen($needle)) === $needle
-                    || (strpos($word, $needle) === 0 && in_array(substr($word, strlen($needle)), ['key', 'id'], true))) {
+                if ($word === $needle || substr($word, -strlen($needle)) === $needle || substr($word, -strlen($needle) - 1) === $needle . 's'
+                    || (strpos($word, $needle) === 0 && self::is_sensitive_tail(substr($word, strlen($needle))))) {
                     return true;
                 }
             }
         }
 
         return false;
+    }
+
+    private static function is_sensitive_tail($tail)
+    {
+        return in_array($tail, self::SENSITIVE_TAILS, true) || ctype_digit($tail);
     }
 
     /** @return string tipe penyamaran, atau '' bila bukan data pelanggan */
