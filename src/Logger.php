@@ -38,62 +38,156 @@ class Logger
         self::cleanup();
     }
 
-    /** Kunci data pelanggan (dibandingkan tanpa "_"/"-", huruf kecil). "name" hanya di dalam blok pelanggan. */
-    const PII = ['email', 'phone', 'phonenumber', 'mobilephone', 'customervaname', 'firstname', 'lastname', 'fullname', 'address', 'merchantuserinfo'];
-    const PII_PARENTS = ['customer', 'customerdetail', 'billingaddress', 'shippingaddress'];
+    /*
+     * Kunci data pelanggan, dibandingkan setelah dinormalkan (huruf kecil, tanpa "_"/"-"):
+     * - mengandung email/phone/mobile/msisdn/address → customer_email, billingPhone, dst.
+     * - berakhiran "name" dengan awalan di PII_NAME_PREFIXES → payerName, customer_va_name, first_name.
+     * - "name" polos hanya bila salah satu induknya (sampai ke atas) blok pelanggan → customer_list[0].name.
+     */
+    const PII_CONTAINS = ['email' => 'email', 'phone' => 'phone', 'mobile' => 'phone', 'msisdn' => 'phone', 'address' => 'address'];
+    const PII_EXACT = ['merchantuserinfo' => 'name', 'merchantuserid' => 'id'];
+    const PII_NAME_PREFIXES = ['customer', 'customerva', 'payer', 'buyer', 'first', 'last', 'full', 'middle', 'billing', 'shipping', 'recipient', 'receiver', 'account', 'holder', 'user'];
+    const PII_PARENTS = ['customer', 'payer', 'buyer', 'billing', 'shipping', 'recipient', 'receiver'];
+    /** Kunci teks bebas yang bisa memuat email/nomor HP pelanggan; isinya disaring dengan regex. */
+    const FREE_TEXT = ['additionalparam', 'productdetail', 'productdetails', 'description', 'note', 'remarks'];
 
-    public static function mask($data, $key = '', $parent = '')
+    /**
+     * @param mixed    $data
+     * @param string   $key     kunci nilai ini
+     * @param string[] $parents kunci induk (ternormalkan), dari atas
+     * @param string   $inherit tipe penyamaran dari induk ('secret', 'email', 'phone', ...): semua daun di bawahnya ikut disamarkan
+     */
+    public static function mask($data, $key = '', $parents = [], $inherit = '')
     {
         if (is_object($data)) {
             $data = get_object_vars($data);
         }
+        $plain = self::normalize_key($key);
+        $parents = (array) $parents;
+
+        $type = $inherit === 'secret' || self::is_sensitive($plain) ? 'secret' : (self::pii_type($plain, $parents) ?: $inherit);
+
         if (is_array($data)) {
             $out = [];
+            $chain = $plain !== '' && !is_numeric($key) ? array_merge($parents, [$plain]) : $parents;
             foreach ($data as $k => $v) {
-                $out[$k] = self::mask($v, (string) $k, (string) $key);
+                $out[$k] = self::mask($v, (string) $k, $chain, $type);
             }
 
             return $out;
         }
-
-        $k = strtolower(str_replace('-', '_', $key));
-        foreach (self::SENSITIVE as $needle) {
-            if ($k !== '' && strpos($k, $needle) !== false) {
-                $value = (string) $data;
-
-                return strlen($value) > 12 ? substr($value, 0, 4) . '…' . substr($value, -4) : ($value === '' ? '' : '***');
-            }
+        if ($data === null || is_bool($data)) {
+            return $data;
         }
+        if ($type === 'secret') {
+            $value = (string) $data;
 
-        $plain = str_replace('_', '', $k);
-        $plain_parent = strtolower(str_replace(['_', '-'], '', $parent));
-        if (is_string($data) && $data !== '' && (in_array($plain, self::PII, true) || ($plain === 'name' && in_array($plain_parent, self::PII_PARENTS, true)))) {
-            return self::mask_pii($plain, $data);
+            return strlen($value) > 12 ? substr($value, 0, 4) . '…' . substr($value, -4) : ($value === '' ? '' : '***');
+        }
+        if ($type !== '') {
+            return (string) $data === '' ? '' : self::mask_pii($type, (string) $data);
+        }
+        if (is_string($data) && in_array($plain, self::FREE_TEXT, true)) {
+            return self::scrub($data);
         }
 
         return $data;
     }
 
-    /** bu***@example.com, 6281****6789, B*** S***, Jl.*** */
+    private static function normalize_key($key)
+    {
+        return strtolower(str_replace(['_', '-', ' '], '', (string) $key));
+    }
+
+    private static function is_sensitive($plain)
+    {
+        if ($plain === '') {
+            return false;
+        }
+        foreach (self::SENSITIVE as $needle) {
+            if (strpos($plain, str_replace('_', '', $needle)) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return string tipe penyamaran, atau '' bila bukan data pelanggan */
+    private static function pii_type($plain, array $parents)
+    {
+        if ($plain === '' || is_numeric($plain)) {
+            return '';
+        }
+        if (isset(self::PII_EXACT[$plain])) {
+            return self::PII_EXACT[$plain];
+        }
+        foreach (self::PII_CONTAINS as $needle => $type) {
+            if (strpos($plain, $needle) !== false) {
+                return $type;
+            }
+        }
+        if (substr($plain, -4) === 'name') {
+            $prefix = substr($plain, 0, -4);
+            if ($prefix !== '' && in_array($prefix, self::PII_NAME_PREFIXES, true)) {
+                return 'name';
+            }
+            if ($prefix === '') {
+                foreach ($parents as $parent) {
+                    foreach (self::PII_PARENTS as $needle) {
+                        if (strpos($parent, $needle) !== false) {
+                            return 'name';
+                        }
+                    }
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /** bu***@example.com, 6281****6789, B*** S***, Jl.***, us*** */
     public static function mask_pii($type, $value)
     {
+        $value = (string) $value;
         if (strpos($value, '@') !== false) {
             [$user, $domain] = explode('@', $value, 2);
 
             return mb_substr($user, 0, 2) . '***@' . $domain;
         }
-        if (strpos($type, 'phone') !== false) {
+        if ($type === 'phone') {
             $digits = preg_replace('/\D+/', '', $value);
 
             return strlen($digits) > 8 ? substr($digits, 0, 4) . str_repeat('*', strlen($digits) - 8) . substr($digits, -4) : '***';
         }
-        if ($type === 'address') {
-            return mb_substr($value, 0, 3) . '***';
+        if ($type === 'address' || $type === 'id') {
+            return mb_substr($value, 0, $type === 'id' ? 2 : 3) . '***';
         }
 
         return implode(' ', array_map(function ($word) {
             return mb_substr($word, 0, 1) . '***';
         }, preg_split('/\s+/', trim($value))));
+    }
+
+    /** Samarkan alamat email dan nomor HP Indonesia (08…, 628…, +628…) di dalam teks bebas. */
+    public static function scrub($text)
+    {
+        $text = preg_replace_callback('/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/', function ($m) {
+            return self::mask_pii('email', $m[0]);
+        }, (string) $text);
+
+        return preg_replace_callback('/(?<![\d\w])(?:\+?62[\s.\-]?|0)8(?:[\s.\-]?\d){7,12}(?!\d)/', function ($m) {
+            return self::mask_pii('phone', $m[0]);
+        }, $text);
+    }
+
+    /** Teks mentah (bukan JSON/form) untuk log: panjang asli + potongan awal yang sudah disamarkan. */
+    public static function excerpt($raw, $max = 200)
+    {
+        $raw = (string) $raw;
+
+        // Disaring sebelum dipotong supaya email/nomor HP di tepi potongan tidak tersisa setengah utuh.
+        return ['length' => strlen($raw), 'excerpt' => mb_substr(self::scrub(mb_substr($raw, 0, $max + 100)), 0, $max)];
     }
 
     public static function dir()

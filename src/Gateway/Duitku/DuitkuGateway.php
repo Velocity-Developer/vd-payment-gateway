@@ -351,7 +351,7 @@ class DuitkuGateway implements GatewayInterface
         $code = (int) wp_remote_retrieve_response_code($response);
         $raw = (string) wp_remote_retrieve_body($response);
         $data = json_decode($raw, true);
-        Logger::log('duitku.request', $log + ['http' => $code, 'response' => is_array($data) ? $data : mb_substr($raw, 0, 1000)]);
+        Logger::log('duitku.request', $log + ['http' => $code, 'response' => is_array($data) ? $data : Logger::excerpt($raw)]);
 
         if ($code !== 200 || !is_array($data)) {
             $message = is_array($data) ? (string) ($data['Message'] ?? ($data['statusMessage'] ?? '')) : '';

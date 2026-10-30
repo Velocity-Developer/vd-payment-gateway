@@ -9,6 +9,7 @@ use VdPaymentGateway\Plugin;
 class NotificationController
 {
     const NAMESPACE = 'vd-pg/v1';
+    const HEADER_MAX = 255;
 
     public function register()
     {
@@ -26,7 +27,7 @@ class NotificationController
         $log = [
             'ip' => $this->log_ip($request),
             'headers' => $this->log_headers($request),
-            'body' => json_decode((string) $request->get_body(), true) ?: ($request->get_body_params() ?: mb_substr((string) $request->get_body(), 0, 1000)),
+            'body' => json_decode((string) $request->get_body(), true) ?: ($request->get_body_params() ?: Logger::excerpt($request->get_body())),
         ];
 
         $gateway = Plugin::instance()->registry()->get($gateway_id);
@@ -58,15 +59,9 @@ class NotificationController
         if (!Logger::enabled()) {
             return [];
         }
-        $ip = ['remote_addr' => isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : ''];
-        foreach (['x_forwarded_for', 'x_real_ip', 'cf_connecting_ip'] as $name) {
-            $value = $request->get_header($name);
-            if ($value !== null && $value !== '') {
-                $ip[$name] = sanitize_text_field($value);
-            }
-        }
+        $ip = ['remote_addr' => isset($_SERVER['REMOTE_ADDR']) ? self::header_value(wp_unslash($_SERVER['REMOTE_ADDR'])) : ''];
 
-        return $ip;
+        return $ip + $this->pick_headers($request, ['x_forwarded_for', 'x_real_ip', 'cf_connecting_ip']);
     }
 
     private function log_headers(\WP_REST_Request $request)
@@ -74,16 +69,26 @@ class NotificationController
         if (!Logger::enabled()) {
             return [];
         }
-        $keep = ['client_id', 'request_id', 'request_timestamp', 'signature', 'content_type', 'user_agent'];
+        return $this->pick_headers($request, ['client_id', 'request_id', 'request_timestamp', 'signature', 'content_type', 'user_agent']);
+    }
+
+    /** Endpoint ini tanpa autentikasi: nilai header disaring dan dipotong supaya entri log tidak bisa dibuat membengkak. */
+    private function pick_headers(\WP_REST_Request $request, array $names)
+    {
         $headers = [];
-        foreach ($keep as $name) {
+        foreach ($names as $name) {
             $value = $request->get_header($name);
             if ($value !== null && $value !== '') {
-                $headers[$name] = $value;
+                $headers[$name] = self::header_value($value);
             }
         }
 
         return $headers;
+    }
+
+    public static function header_value($value)
+    {
+        return mb_substr(sanitize_text_field((string) $value), 0, self::HEADER_MAX);
     }
 
     private function error_response(\WP_Error $error, $gateway_id = '', array $log = [])

@@ -416,7 +416,7 @@ class DokuGateway implements GatewayInterface
         $code = (int) wp_remote_retrieve_response_code($response);
         $raw = (string) wp_remote_retrieve_body($response);
         $data = json_decode($raw, true, 512, JSON_BIGINT_AS_STRING);
-        Logger::log('doku.request', $log + ['http' => $code, 'response' => is_array($data) ? $data : mb_substr($raw, 0, 1000)]);
+        Logger::log('doku.request', $log + ['http' => $code, 'response' => is_array($data) ? $data : Logger::excerpt($raw)]);
 
         if ($code < 200 || $code >= 300 || !is_array($data)) {
             $messages = is_array($data) ? ($data['error_messages'] ?? ($data['message'] ?? $data['error']['message'] ?? '')) : '';
