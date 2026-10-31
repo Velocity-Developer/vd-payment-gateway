@@ -312,7 +312,8 @@ class DuitkuGateway implements GatewayInterface
         $invoice = $data['merchantOrderId'] ?? '';
         $signature = $data['signature'] ?? '';
 
-        if ($merchant_code === '' || $amount === '' || $invoice === '' || $signature === '') {
+        // amount boleh kosong untuk callback gagal; callback sukses tanpa nominal ditolak di bawah.
+        if ($merchant_code === '' || $invoice === '' || $signature === '') {
             return new \WP_Error('vdpg_duitku_params', 'Parameter tidak lengkap', ['status' => 400]);
         }
         if (!hash_equals((string) $options['merchant_code'], $merchant_code)) {
@@ -327,6 +328,11 @@ class DuitkuGateway implements GatewayInterface
         }
 
         $result_code = $data['resultCode'] ?? '';
+        if ($result_code === '00' && !preg_match('/^\d+(\.\d+)?$/', $amount)) {
+            Logger::log('status.amount_mismatch', ['gateway' => 'duitku', 'invoice' => $invoice, 'notified' => $amount, 'reason' => 'callback sukses tanpa nominal valid']);
+
+            return new \WP_Error('vdpg_amount_mismatch', 'Nominal tidak valid', ['status' => 400]);
+        }
 
         return [
             'invoice' => $invoice,
