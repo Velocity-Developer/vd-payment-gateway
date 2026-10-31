@@ -329,7 +329,12 @@ class DuitkuGateway implements GatewayInterface
 
         $result_code = $data['resultCode'] ?? '';
         if ($result_code === '00' && !preg_match('/^\d+(\.\d+)?$/', $amount)) {
-            Logger::log('status.amount_mismatch', ['gateway' => 'duitku', 'invoice' => $invoice, 'notified' => $amount, 'reason' => 'callback sukses tanpa nominal valid']);
+            // Duitku mengulang callback yang ditolak; catat paling banyak 1x per jam per invoice supaya log tidak penuh.
+            $throttle = 'vdpg_duitku_badamt_' . md5($invoice);
+            if (!get_transient($throttle)) {
+                set_transient($throttle, 1, HOUR_IN_SECONDS);
+                Logger::log('status.amount_mismatch', ['gateway' => 'duitku', 'invoice' => $invoice, 'notified' => $amount, 'reason' => 'callback sukses tanpa nominal valid']);
+            }
 
             return new \WP_Error('vdpg_amount_mismatch', 'Nominal tidak valid', ['status' => 400]);
         }

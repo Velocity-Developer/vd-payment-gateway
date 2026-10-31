@@ -47,9 +47,11 @@ $c = $cb($inv, '', '00');
 dcheck('Sukses dengan amount kosong ditolak, tetap pending', $c >= 400 && $st() === 'pending', "http $c, " . $st());
 $logf = class_exists('\VdPaymentGateway\Logger') ? \VdPaymentGateway\Logger::files() : [];
 $log = $logf ? (string) file_get_contents($logf[0]) : '';
-dcheck('dicatat sebagai status.amount_mismatch di log', substr_count($log, 'status.amount_mismatch {"gateway":"duitku","invoice":"' . $inv) >= 3);
+dcheck('3 callback ditolak dicatat 1x saja (dibatasi per jam per invoice)', substr_count($log, 'status.amount_mismatch {"gateway":"duitku","invoice":"' . $inv) === 1, substr_count($log, 'status.amount_mismatch {"gateway":"duitku","invoice":"' . $inv) . 'x');
+delete_transient('vdpg_duitku_badamt_' . md5($inv));
 $c = $cb($inv, '', '02', false);
 dcheck('Gagal tanpa amount tetap diterima (200) → failed', $c === 200 && $st() === 'failed', "http $c, " . $st());
+dcheck('Gagal tanpa amount tidak menimpa nominal transaksi (tetap 50000)', (int) vd_pg_get_transaction('duitku', $inv)->amount === 50000, (string) vd_pg_get_transaction('duitku', $inv)->amount);
 
 $inv2 = 'DB-' . $run;
 (new \VdPaymentGateway\Transaction\TransactionRepository())->upsert_pending('duitku', $inv2, ['source' => 'uji', 'ref_id' => '2', 'amount' => 50000]);
@@ -79,8 +81,22 @@ if (!function_exists('velocitytoko_order_mark_paid')) {
     dcheck('email admin "nominal tidak sesuai" terkirim tepat 1x untuk 3 callback salah', $mails_to('VTA' . $run . ': nominal tidak sesuai') === 1, $mails_to('VTA' . $run . ': nominal tidak sesuai') . 'x');
     $log = $logf ? (string) file_get_contents($logf[0]) : '';
     dcheck('log toko mencatat 3x status.amount_mismatch (source velocity-toko)', substr_count($log, '"source":"velocity-toko","invoice":"VTA' . $run . '"') === 3 && strpos($log, '"notified":"10000","billed":125000') !== false);
+    $m = array_values(array_filter($GLOBALS['mails'], function ($m) use ($run) { return strpos((string) $m['subject'], 'VTA' . $run . ': nominal tidak sesuai') !== false; }));
+    dcheck('email nominal kosong menyebut "tidak valid", bukan Rp 0', $m && strpos($m[0]['message'], 'Nominal dibayar: tidak valid') !== false, $m ? strip_tags($m[0]['message']) : '-');
+    do_action('velocity_duitku_callback', ['merchantOrderId' => 'VTA' . $run, 'resultCode' => '00', 'amount' => '124999.5']);
+    dcheck('callback lama amount pecahan (124999.5) tidak dibulatkan jadi Lunas', $status($o) === 'Transaksi Baru', $status($o));
+    $GLOBALS['mails'] = [];
     do_action('velocity_duitku_callback', ['merchantOrderId' => 'VTA' . $run, 'resultCode' => '00', 'amount' => '125000.00']);
     dcheck('callback lama amount = total → Lunas', $status($o) === 'Lunas', $status($o));
+    dcheck('email lunas lama memakai nomor invoice & UTF-8', $mails_to('Invoice #VTA' . $run . ' telah dibayarkan') === 2 && stripos(implode('', (array) $GLOBALS['mails'][0]['headers']), 'charset=UTF-8') !== false, wp_json_encode(array_column($GLOBALS['mails'], 'subject')));
+
+    // Pesanan toko yang dibayar lewat vd-payment-gateway: action lama untuk transaksi yang sama diabaikan.
+    $p = $mk('P');
+    (new \VdPaymentGateway\Transaction\TransactionRepository())->upsert_pending('duitku', 'VTP' . $run, ['source' => 'velocity-toko', 'ref_id' => (string) $p, 'amount' => 125000]);
+    $GLOBALS['mails'] = [];
+    do_action('velocity_duitku_callback', ['merchantOrderId' => 'VTP' . $run, 'resultCode' => '00', 'amount' => '1']);
+    dcheck('action lama untuk pesanan lewat vdpg diabaikan (tanpa email/status)', count($GLOBALS['mails']) === 0 && $status($p) === 'Transaksi Baru', count($GLOBALS['mails']) . ' email, ' . $status($p));
+    delete_option('velocitytoko_pg_mismatch_' . $p);
 
     // Pesanan yang sudah Lunas / berstatus lanjut: nominal salah tidak mengirim email palsu, status tetap.
     foreach (['L' => 'Lunas', 'S' => 'Sukses'] as $k => $stt) {
@@ -108,6 +124,6 @@ if (!function_exists('velocitytoko_order_mark_paid')) {
     delete_option('velocitytoko_pg_mismatch_' . $o);
 }
 // Bersihkan transaksi uji.
-$wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}vdpg_transactions WHERE invoice IN (%s, %s)", $inv, $inv2));
+$wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}vdpg_transactions WHERE invoice IN (%s, %s, %s)", $inv, $inv2, 'VTP' . $run));
 update_option('vdpg_debug_log', '0');
 echo "\nHasil: {$GLOBALS['pass']} lulus, {$GLOBALS['fail']} gagal\n";
