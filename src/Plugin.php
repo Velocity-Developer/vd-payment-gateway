@@ -5,6 +5,7 @@ namespace VdPaymentGateway;
 use VdPaymentGateway\Admin\SettingsPage;
 use VdPaymentGateway\Compat\LegacyDuitku;
 use VdPaymentGateway\Gateway\Registry;
+use VdPaymentGateway\Rest\AdminController;
 use VdPaymentGateway\Rest\NotificationController;
 use VdPaymentGateway\Transaction\Installer;
 
@@ -29,6 +30,7 @@ class Plugin
         LegacyDuitku::boot();
 
         add_action('rest_api_init', [new NotificationController(), 'register']);
+        add_action('rest_api_init', [new AdminController(), 'register']);
 
         if (is_admin()) {
             (new SettingsPage())->register();
