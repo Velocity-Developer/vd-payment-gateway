@@ -38,7 +38,8 @@ VDPG_TEST_WP=/path/wordpress tests/run-tests.sh              # semua suite
 VDPG_TEST_WP=/path/wordpress tests/run-tests.sh duitku-amount e2e
 ```
 
-- Butuh `php`, `curl`, `lsof`, dan WP-CLI (`wp` di PATH, atau `WP_CLI="php /path/wp-cli.phar"`).
+- Butuh `php`, `curl`, dan WP-CLI (`wp` di PATH, atau `WP_CLI="php /path/wp-cli.phar"`).
+  `lsof` opsional tetapi disarankan: tanpa itu, proses `sendmail` sisa `wp_mail()` tidak ikut dimatikan.
 - Port 8791 harus bebas; bila terpakai proses lain, skrip berhenti dengan kode 2.
 - Server `php -S` (maks. 15 menit) dan proses `sendmail` turunannya dimatikan otomatis saat selesai,
   gagal, atau diinterupsi.
