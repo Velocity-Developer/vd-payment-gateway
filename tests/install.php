@@ -22,6 +22,7 @@ update_option('permalink_structure', '/%postname%/');
 $mu = WP_CONTENT_DIR . '/mu-plugins';
 wp_mkdir_p($mu);
 copy(__DIR__ . '/mu-plugins/vdpg-hooklog.php', $mu . '/vdpg-hooklog.php');
+copy(__DIR__ . '/mu-plugins/vdpg-checkout-js.php', $mu . '/vdpg-checkout-js.php');
 
 foreach (['vd-payment-gateway', 'velocity-toko', 'velocity-donasi', 'vd-store', 'vd-marketplace'] as $slug) {
     $file = $slug . '/' . $slug . '.php';
