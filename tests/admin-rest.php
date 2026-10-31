@@ -164,7 +164,7 @@ try {
     $r = wp_remote_get($url, ['cookies' => $cookies, 'timeout' => 20]);
     ar_check('cookie admin tanpa X-WP-Nonce ditolak (401)', wp_remote_retrieve_response_code($r) === 401, (string) wp_remote_retrieve_response_code($r));
     $r = wp_remote_get($url, ['cookies' => $cookies, 'headers' => ['X-WP-Nonce' => 'salah123'], 'timeout' => 20]);
-    ar_check('nonce salah ditolak (403)', wp_remote_retrieve_response_code($r) === 403, (string) wp_remote_retrieve_response_code($r));
+    ar_check('nonce salah ditolak (403, kode rest_cookie_invalid_nonce untuk pesan "muat ulang" di admin.js)', wp_remote_retrieve_response_code($r) === 403 && strpos(wp_remote_retrieve_body($r), '"code":"rest_cookie_invalid_nonce"') !== false, (string) wp_remote_retrieve_response_code($r));
     $r = wp_remote_get($url, ['cookies' => $cookies, 'headers' => ['X-WP-Nonce' => $nonce], 'timeout' => 20]);
     ar_check('cookie + nonce benar: 200 tanpa secret', wp_remote_retrieve_response_code($r) === 200 && strpos(wp_remote_retrieve_body($r), $secret) === false, (string) wp_remote_retrieve_response_code($r));
 

@@ -32,6 +32,10 @@
         }).then(function (res) {
             return res.json().catch(function () { return {}; }).then(function (data) {
                 if (!res.ok) {
+                    // Nonce wp_rest kedaluwarsa (tab terbuka lama): minta muat ulang, bukan galat umum.
+                    if (data && data.code === 'rest_cookie_invalid_nonce') {
+                        throw new Error(i18n.expired);
+                    }
                     throw new Error((data && data.message) || i18n.error);
                 }
                 return data;

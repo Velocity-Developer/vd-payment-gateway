@@ -63,7 +63,7 @@ class SettingsPage
                 'inactive' => __('Nonaktif', 'vd-payment-gateway'),
                 'logOn' => __('Mencatat', 'vd-payment-gateway'),
                 'logOff' => __('Mati', 'vd-payment-gateway'),
-                'confirmClear' => __('Hapus semua log?', 'vd-payment-gateway'),
+                'expired' => __('Sesi halaman ini sudah kedaluwarsa. Muat ulang halaman lalu coba lagi.', 'vd-payment-gateway'),
                 'error' => __('Gagal terhubung ke server. Coba lagi, atau muat ulang halaman.', 'vd-payment-gateway'),
                 'lines' => __('%d baris terakhir', 'vd-payment-gateway'),
                 'page' => __('Halaman %1$d dari %2$d (%3$d transaksi)', 'vd-payment-gateway'),
@@ -432,7 +432,7 @@ class SettingsPage
             <?php $this->section_close(); ?>
             <div class="vdpg-actions">
                 <?php submit_button(__('Simpan', 'vd-payment-gateway'), 'primary', 'submit', false, [':disabled' => 'busy']); ?>
-                <?php submit_button(__('Hapus semua log', 'vd-payment-gateway'), 'delete', 'clear', false, ['onclick' => "return confirm('Hapus semua log?');", ':disabled' => 'busy']); ?>
+                <?php submit_button(__('Hapus semua log', 'vd-payment-gateway'), 'delete', 'clear', false, ['onclick' => 'return confirm(' . wp_json_encode(__('Hapus semua log?', 'vd-payment-gateway')) . ');', ':disabled' => 'busy']); ?>
                 <span class="spinner" :class="{'is-active': busy}" aria-hidden="true"></span>
                 <span class="vdpg-inline-msg" x-cloak x-show="$store.vdpgNotice.text !== ''" :class="{'is-error': $store.vdpgNotice.type === 'error'}" x-text="$store.vdpgNotice.text" aria-hidden="true"></span>
             </div>
