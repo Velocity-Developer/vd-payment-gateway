@@ -7,6 +7,9 @@ global $wpdb;
 $GLOBALS['pass'] = 0; $GLOBALS['fail'] = 0;
 function tcheck($label, $ok, $info = '') { $ok ? $GLOBALS['pass']++ : $GLOBALS['fail']++; echo ($ok ? '  OK  ' : '  GAGAL ') . $label . ($info !== '' ? " — $info" : '') . "\n"; }
 $NEW = function_exists('velocitytoko_checkout_server_total');
+// velocity-toko 1.3.5 (hotfix) belum punya velocitytoko_parse_ongkir: pakai format lama "kode - layanan - ongkir".
+$ONGKIR_PARSER = function_exists('velocitytoko_parse_ongkir');
+$ongkir_of = function ($v) use ($ONGKIR_PARSER) { if ($ONGKIR_PARSER) { return velocitytoko_parse_ongkir($v)['ongkir']; } $x = explode('-', $v); return (int) preg_replace('/\D+/', '', end($x)); };
 echo $NEW ? "(kode baru)\n" : "(kode lama: tanpa hitung ulang server)\n";
 
 if (!isset($_SESSION) || !is_array($_SESSION)) { $_SESSION = []; }
@@ -79,14 +82,14 @@ $cart_default = [
     "k2" => ['id' => 'k2', 'jumlah' => 1, 'detail' => wp_json_encode([$p2, null, ['Ukuran', 'XL', '75000']])],
 ];
 // Isian form seperti yang dibuat checkout.php + checkout.js untuk pembeli jujur.
-$honest = function (array $o = []) use ($p1, $p2) {
+$honest = function (array $o = []) use ($p1, $p2, $ongkir_of) {
     $sub = 2 * 90000 + 75000;
     $kupon = $o['kupon'] ?? ['kode' => '', 'potongan' => '', 'jenis' => ''];
     if ($kupon['jenis'] === 'percent') { $sub = $sub - $sub * $kupon['potongan'] / 100; }
     if ($kupon['jenis'] === 'rupiah') { $sub = $sub - $kupon['potongan']; }
     $ongkir = $o['ongkir'] ?? 'JNE - REG - 54000';
     $ku = $o['kodeunik'] ?? null;
-    $total = $sub + velocitytoko_parse_ongkir($ongkir)['ongkir'] + (int) $ku;
+    $total = $sub + $ongkir_of($ongkir) + (int) $ku;
     $post = [
         'nama' => 'Rina Pembeli', 'email' => 'rina@example.com', 'hp' => '081233334444', 'alamat' => 'Jl. Uji 1', 'kodepos' => '12345',
         'pengiriman' => 'no', 'subdistrict_destination' => '1001', 'city_destination' => '77', 'prov_destination' => '1',
@@ -144,6 +147,7 @@ $r = $run($honest(['pembayaran' => 'duitku', 'ongkir' => 'JNE - YES - 66000']));
 tcheck('Duitku dengan ongkir YES: total 321.000', $r[1] && (int) $r[1]->total === 321000, $r[1] ? $r[1]->total : strip_tags($r[0]));
 tcheck('email pembeli memuat total server', $r[1] && (bool) array_filter($GLOBALS['mails'], function ($m) { return strpos($m['message'], '321.000') !== false; }));
 
+if ($ONGKIR_PARSER) {
 echo "== Nama layanan ongkir mengandung \"-\"\n";
 $po = function ($v) { $x = velocitytoko_parse_ongkir($v); return $x['kode'] . '|' . $x['layanan'] . '|' . $x['ongkir'] . ($x['valid'] ? '' : '|x'); };
 foreach (['JNE - REG-23 - 59000' => 'JNE|REG-23|59000', 'JNE - YES-1-DAY - 74000' => 'JNE|YES-1-DAY|74000', 'JNE - REG - 54000' => 'JNE|REG|54000',
@@ -158,6 +162,7 @@ $r = $run($honest(['pembayaran' => 'duitku', 'ongkir' => 'JNE - YES-1-DAY - 7400
 tcheck('checkout ongkir YES-1-DAY: total 329.000', $r[1] && (int) $r[1]->total === 329000 && $r[1]->kurir === 'JNE - YES-1-DAY - 74000', $r[1] ? $r[1]->total . ' ' . $r[1]->kurir : strip_tags($r[0]));
 $p = $honest(['pembayaran' => 'duitku', 'ongkir' => 'JNE - YES-1-DAY - 1000']); $p['produk']['hargatotal'] = (string) (255000 + 1000);
 tcheck('ongkir YES-1-DAY dimurahkan → ditolak', $rejected($run($p)));
+}
 
 $wpdb->delete($tk, ['kode' => 'ONGKIR10']);
 $wpdb->insert($tk, ['kode' => 'ONGKIR10', 'detail' => wp_json_encode(['kode' => 'ONGKIR10', 'jenis' => 'ongkir', 'potongan' => '10000', 'minorder' => '0', 'tanggalend' => '31 Desember 2030', 'status' => 'on', 'jumlah' => 5])]);

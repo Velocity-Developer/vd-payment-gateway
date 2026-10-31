@@ -93,5 +93,5 @@ Nama berkas memakai hash acak per situs. Bila perlu, pindahkan foldernya ke luar
 
 ## Pengujian
 
-Skrip ujung-ke-ujung (mock DOKU & Duitku, aman dijalankan berulang) ada di luar repo pada server pengembangan:
-`/root/vdpg-test/scripts/e2e.php` → `wp eval-file e2e.php`.
+Skrip ujung-ke-ujung (mock DOKU & Duitku, aman dijalankan berulang) ada di folder `tests/` (tidak ikut zip rilis).
+Jalankan `VDPG_TEST_WP=/path/wordpress tests/run-tests.sh`; lihat `tests/README.md`.
