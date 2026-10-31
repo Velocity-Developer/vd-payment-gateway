@@ -182,6 +182,64 @@ class TransactionRepository
         ], ['id' => (int) $id]);
     }
 
+    /**
+     * Daftar transaksi dengan filter untuk dashboard admin.
+     * $filters: search (invoice/referensi/ref_id), status, gateway. Mengembalikan ['rows' => [], 'total' => int].
+     */
+    public function search(array $filters, $limit = 50, $offset = 0)
+    {
+        global $wpdb;
+
+        $where = ['1=1'];
+        $values = [];
+        $status = (string) ($filters['status'] ?? '');
+        if (in_array($status, self::STATUSES, true)) {
+            $where[] = 'status = %s';
+            $values[] = $status;
+        }
+        $gateway = sanitize_key((string) ($filters['gateway'] ?? ''));
+        if ($gateway !== '') {
+            $where[] = 'gateway = %s';
+            $values[] = $gateway;
+        }
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            // INSTR, bukan LIKE: % dan _ dari pengguna tetap huruf biasa di MySQL maupun SQLite (LIKE di SQLite tanpa ESCAPE).
+            $needle = mb_strtolower($search);
+            $where[] = '(INSTR(LOWER(invoice), %s) > 0 OR INSTR(LOWER(reference), %s) > 0 OR INSTR(LOWER(ref_id), %s) > 0)';
+            array_push($values, $needle, $needle, $needle);
+        }
+        $where_sql = implode(' AND ', $where);
+
+        $count_sql = "SELECT COUNT(*) FROM {$this->table()} WHERE $where_sql";
+        $total = (int) $wpdb->get_var($values ? $wpdb->prepare($count_sql, $values) : $count_sql);
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$this->table()} WHERE $where_sql ORDER BY id DESC LIMIT %d OFFSET %d",
+            array_merge($values, [(int) $limit, (int) $offset])
+        ));
+
+        return ['rows' => $rows ?: [], 'total' => $total];
+    }
+
+    /** Jumlah transaksi dan total nominal per status. */
+    public function stats()
+    {
+        global $wpdb;
+
+        $stats = [];
+        foreach (self::STATUSES as $status) {
+            $stats[$status] = ['count' => 0, 'amount' => 0];
+        }
+        $rows = $wpdb->get_results("SELECT status, COUNT(*) AS n, SUM(amount) AS total FROM {$this->table()} GROUP BY status");
+        foreach ((array) $rows as $row) {
+            if (isset($stats[$row->status])) {
+                $stats[$row->status] = ['count' => (int) $row->n, 'amount' => (int) $row->total];
+            }
+        }
+
+        return $stats;
+    }
+
     public function latest($limit = 50, $offset = 0, $gateway = '')
     {
         global $wpdb;

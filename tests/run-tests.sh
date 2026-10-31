@@ -12,7 +12,7 @@ if [ -z "${WP_CLI:-}" ]; then
     if [ -f "$WP/../wp" ]; then WP_CLI="php $(cd "$WP/.." && pwd)/wp"; else WP_CLI=wp; fi
 fi
 SUITES=("$@")
-[ ${#SUITES[@]} -eq 0 ] && SUITES=(toko-e2e log-mask e2e mp-e2e donasi-e2e duitku-amount checkout-js)
+[ ${#SUITES[@]} -eq 0 ] && SUITES=(toko-e2e log-mask e2e mp-e2e donasi-e2e duitku-amount checkout-js admin-rest)
 
 if [ ! -f "$WP/wp-load.php" ]; then
     echo "WordPress uji tidak ditemukan di $WP (atur VDPG_TEST_WP)." >&2
@@ -24,9 +24,14 @@ port_busy() { (exec 3<>/dev/tcp/127.0.0.1/$PORT) 2>/dev/null; }
 # sendmail yang dipanggil wp_mail() di sisi server mewarisi socket port ini; ikut dimatikan.
 kill_server() {
     for p in $(pgrep -f "^php -S 127.0.0.1:$PORT"); do kill "$p" 2>/dev/null; done
-    for p in $(lsof -t -nP -iTCP:$PORT -sTCP:LISTEN 2>/dev/null); do
-        case "$(ps -o comm= -p "$p")" in sendmail|dotlockfi*) kill "$p" 2>/dev/null;; esac
-    done
+    # Server dijalankan dengan setsid: semua turunannya (sendmail dll.) satu session dengan PID setsid.
+    [ -n "${SRV_SID:-}" ] && pkill -s "$SRV_SID" 2>/dev/null
+    # Sisa run sebelumnya: cari pemegang port lewat ss bila ada (tanpa lsof, yang bisa menggantung).
+    if command -v ss >/dev/null; then
+        for p in $(timeout 10 ss -ltnpH "sport = :$PORT" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u); do
+            case "$(ps -o comm= -p "$p")" in sendmail|dotlockfi*) kill "$p" 2>/dev/null;; esac
+        done
+    fi
 }
 
 kill_server
@@ -38,6 +43,7 @@ fi
 
 cd "$WP" || exit 2
 setsid nohup timeout 900 php -S 127.0.0.1:$PORT >/tmp/php$PORT.log 2>&1 &
+SRV_SID=$!
 trap kill_server EXIT INT TERM
 for i in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 0.5; done
 

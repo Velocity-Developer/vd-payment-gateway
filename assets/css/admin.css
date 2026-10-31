@@ -720,3 +720,150 @@
     text-align: center;
   }
 }
+
+/* Alpine.js (0.3.0): elemen yang hanya untuk JS disembunyikan sampai Alpine siap. */
+.vdpg-wrap [x-cloak] {
+  display: none !important;
+}
+
+.vdpg-wrap .spinner {
+  float: none;
+  margin: 0;
+}
+
+.vdpg-wrap .vdpg-live-notice {
+  margin: 0 0 1rem;
+}
+
+/* Kartu statistik transaksi */
+.vdpg-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+}
+
+.vdpg-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  border: 1px solid var(--vdpg-border);
+  border-left: 4px solid #9ca3af;
+  border-radius: var(--vdpg-radius);
+}
+
+.vdpg-stat--success { border-left-color: #22c55e; }
+.vdpg-stat--warning { border-left-color: #f59e0b; }
+.vdpg-stat--danger { border-left-color: #ef4444; }
+
+.vdpg-stat__label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--vdpg-muted);
+}
+
+.vdpg-stat__count {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  color: var(--vdpg-heading);
+}
+
+.vdpg-stat__amount {
+  font-size: 13px;
+  color: var(--vdpg-muted);
+}
+
+/* Filter transaksi (di atas tabel; badan kartu tabel tanpa padding) */
+.vdpg-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--vdpg-border-soft);
+}
+
+.vdpg-wrap .vdpg-filter input[type="search"] {
+  flex: 1 1 240px;
+  width: auto;
+  min-height: 38px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--vdpg-border);
+  border-radius: 0.5rem;
+}
+
+.vdpg-wrap .vdpg-filter select {
+  flex: 0 1 190px;
+  width: auto;
+}
+
+/* Channel panjang tanpa spasi (VIRTUAL_ACCOUNT_BRI) boleh terpotong baris agar tombol aksi tetap terlihat. */
+.vdpg-table td.vdpg-col-channel {
+  overflow-wrap: anywhere;
+  min-width: 90px;
+}
+
+.vdpg-table td.vdpg-col-action {
+  white-space: nowrap;
+}
+
+/* Pesan hasil simpan di samping tombol (pemberitahuan di atas bisa tidak terlihat bila halaman digulir). */
+.vdpg-inline-msg {
+  font-size: 13px;
+  font-weight: 600;
+  color: #15803d;
+}
+
+.vdpg-inline-msg.is-error {
+  color: #b91c1c;
+}
+
+.vdpg-pagination__info,
+.vdpg-log-count {
+  color: var(--vdpg-muted);
+  font-size: 13px;
+}
+
+.vdpg-log-count {
+  margin: 0 0 0.5rem;
+}
+
+.vdpg-spin {
+  animation: vdpg-spin 1s linear infinite;
+}
+
+@keyframes vdpg-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vdpg-spin {
+    animation: none;
+  }
+}
+
+@media (max-width: 782px) {
+  .vdpg-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .vdpg-stat {
+    padding: 0.75rem 1rem;
+  }
+
+  .vdpg-stat__count {
+    font-size: 1.4rem;
+  }
+
+  .vdpg-wrap .vdpg-filter select,
+  .vdpg-wrap .vdpg-filter input[type="search"] {
+    flex: 1 1 100%;
+    min-height: 44px;
+  }
+}
