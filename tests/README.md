@@ -16,6 +16,7 @@ Folder ini tidak ikut di zip rilis (`.gitattributes` export-ignore dan `.distign
 | `toko-e2e.php` | velocity-toko: total checkout di server, ongkir, DOKU, lacak, sinkron status |
 | `donasi-e2e.php` | velocity-donasi: invoice server, DOKU, Duitku callback |
 | `mp-e2e.php` | vd-marketplace + DOKU |
+| `checkout-js.mjs` | browser (Playwright): halaman checkout vd-store tanpa error JS saat COD mati, ongkir off, semua produk digital (regresi `isCodPayment`, vd-store 1.5.1); pembantunya `checkout-js-setup.php` + `mu-plugins/vdpg-checkout-js.php` |
 
 Suite plugin yang tidak terpasang akan gagal; jalankan hanya suite yang relevan.
 
@@ -44,3 +45,10 @@ VDPG_TEST_WP=/path/wordpress tests/run-tests.sh duitku-amount e2e
 - Server `php -S` (maks. 15 menit) dan proses `sendmail` turunannya dimatikan otomatis saat selesai,
   gagal, atau diinterupsi.
 - Keluaran hanya baris `GAGAL`/`Fatal`/`Hasil`; kode keluar 0 bila semua suite `0 gagal`.
+- `checkout-js` butuh Node dan Playwright: `npm i playwright-core` di folder induk WordPress uji
+  (`/path/node_modules`), atau `VDPG_PLAYWRIGHT=/path/node_modules/playwright-core`. Chromium diambil dari
+  `VDPG_CHROMIUM`, bawaan Playwright, atau build mana pun di `~/.cache/ms-playwright`. Tanpa Playwright/
+  Chromium suite ini dilewati (tetap `0 gagal`). Selama tes, vd-marketplace dinonaktifkan sementara
+  (ia mengambil alih `[wp_store_checkout]`) lalu diaktifkan lagi.
+- Uji balik versi plugin lain (mis. `ln -sfn` ke worktree lama): jalankan lewat `run-tests.sh` agar server
+  dimulai ulang; `php -S` yang sudah jalan menyimpan cache realpath symlink lama.

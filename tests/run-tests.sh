@@ -12,7 +12,7 @@ if [ -z "${WP_CLI:-}" ]; then
     if [ -f "$WP/../wp" ]; then WP_CLI="php $(cd "$WP/.." && pwd)/wp"; else WP_CLI=wp; fi
 fi
 SUITES=("$@")
-[ ${#SUITES[@]} -eq 0 ] && SUITES=(toko-e2e log-mask e2e mp-e2e donasi-e2e duitku-amount)
+[ ${#SUITES[@]} -eq 0 ] && SUITES=(toko-e2e log-mask e2e mp-e2e donasi-e2e duitku-amount checkout-js)
 
 if [ ! -f "$WP/wp-load.php" ]; then
     echo "WordPress uji tidak ditemukan di $WP (atur VDPG_TEST_WP)." >&2
@@ -44,8 +44,14 @@ for i in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break
 rc=0
 for s in "${SUITES[@]}"; do
     echo "== $s"
-    out=$($WP_CLI --allow-root eval-file "$DIR/$s.php" 2>&1)
+    if [ -f "$DIR/$s.mjs" ]; then
+        # Suite browser (Node + Playwright); lihat komentar di kepala berkasnya.
+        out=$(WP="$WP" WP_CLI="$WP_CLI" node "$DIR/$s.mjs" 2>&1)
+    else
+        out=$($WP_CLI --allow-root eval-file "$DIR/$s.php" 2>&1)
+    fi
     echo "$out" | grep -E "GAGAL|Fatal|^Hasil"
-    echo "$out" | grep -q "0 gagal" || rc=1
+    # Pola utuh: "10 gagal" tidak boleh dianggap "0 gagal".
+    echo "$out" | grep -qE "^Hasil: [0-9]+ lulus, 0 gagal" || rc=1
 done
 exit $rc
