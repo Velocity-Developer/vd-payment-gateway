@@ -312,11 +312,11 @@ class SettingsPage
                 <div class="vdpg-form-group vdpg-form-group--checkbox">
                     <div class="vdpg-form-left">
                         <label class="vdpg-form-label" for="vdpg_log_enabled"><?php esc_html_e('Catat permintaan ke API gateway, notifikasi masuk, dan perubahan status.', 'vd-payment-gateway'); ?></label>
-                        <small class="vdpg-form-hint"><?php printf(esc_html__('Secret key dan signature disamarkan. Berkas disimpan %d hari di uploads/vdpg-logs/. Matikan lagi setelah selesai pengecekan.', 'vd-payment-gateway'), Logger::LOG_DAYS); ?></small>
+                        <small class="vdpg-form-hint" id="vdpg_log_enabled_hint"><?php printf(esc_html__('Secret key dan signature disamarkan. Berkas disimpan %d hari di uploads/vdpg-logs/. Matikan lagi setelah selesai pengecekan.', 'vd-payment-gateway'), Logger::LOG_DAYS); ?></small>
                     </div>
                     <div class="vdpg-form-right">
                         <label class="vdpg-switch">
-                            <input type="checkbox" id="vdpg_log_enabled" name="enabled" value="1" <?php checked(Logger::enabled()); ?>>
+                            <input type="checkbox" id="vdpg_log_enabled" name="enabled" value="1" aria-describedby="vdpg_log_enabled_hint" <?php checked(Logger::enabled()); ?>>
                             <span class="vdpg-switch__slider" aria-hidden="true"></span>
                         </label>
                     </div>
