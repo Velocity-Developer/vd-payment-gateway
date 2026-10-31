@@ -15,7 +15,16 @@ Menu **Payment Gateway → DOKU** di wp-admin:
 Menu **Payment Gateway → Duitku**: Aktifkan, Mode, Kode Merchant, API Key, batas bayar, Return URL bawaan.
 Callback URL dikirim otomatis per transaksi (`/wp-json/vd-pg/v1/notify/duitku`), tidak perlu diisi di dashboard Duitku.
 
-Tab **Transaksi** menampilkan riwayat dan tombol **Cek status** (memanggil API cek status gateway).
+Tab **Transaksi** menampilkan kartu statistik (lunas, menunggu, kedaluwarsa, gagal), pencarian invoice/referensi,
+filter status dan gateway, serta tombol **Cek status** (memanggil API cek status gateway).
+
+### Dashboard (0.3.0)
+
+- Simpan, filter, dan cek status berjalan tanpa muat ulang lewat Alpine.js + REST `vd-pg/v1/admin/*`
+  (hanya `manage_options`, wajib header `X-WP-Nonce`). Secret key tidak pernah dikirim ke browser.
+- Alpine.js 3.14.8 disimpan lokal di `assets/vendor/alpinejs/` (versi, sumber, SHA-256 di README folder itu)
+  dan hanya dimuat di halaman Payment Gateway; tidak memakai CDN.
+- Bila JavaScript gagal dimuat, semua formulir tetap tersimpan lewat `admin-post.php` seperti sebelumnya.
 
 ## API untuk plugin lain
 

@@ -337,6 +337,7 @@ class SettingsPage
             <div class="vdpg-actions">
                 <?php submit_button(__('Simpan Perubahan', 'vd-payment-gateway'), 'primary', 'submit', false, [':disabled' => 'busy']); ?>
                 <span class="spinner" :class="{'is-active': busy}" aria-hidden="true"></span>
+                <span class="vdpg-inline-msg" x-cloak x-show="$store.vdpgNotice.text !== ''" :class="{'is-error': $store.vdpgNotice.type === 'error'}" x-text="$store.vdpgNotice.text" aria-hidden="true"></span>
             </div>
         </form>
         <?php
@@ -433,6 +434,7 @@ class SettingsPage
                 <?php submit_button(__('Simpan', 'vd-payment-gateway'), 'primary', 'submit', false, [':disabled' => 'busy']); ?>
                 <?php submit_button(__('Hapus semua log', 'vd-payment-gateway'), 'delete', 'clear', false, ['onclick' => "return confirm('Hapus semua log?');", ':disabled' => 'busy']); ?>
                 <span class="spinner" :class="{'is-active': busy}" aria-hidden="true"></span>
+                <span class="vdpg-inline-msg" x-cloak x-show="$store.vdpgNotice.text !== ''" :class="{'is-error': $store.vdpgNotice.type === 'error'}" x-text="$store.vdpgNotice.text" aria-hidden="true"></span>
             </div>
         </form>
         <?php $this->section_open(sprintf(__('%d baris terakhir', 'vd-payment-gateway'), count($lines))); ?>

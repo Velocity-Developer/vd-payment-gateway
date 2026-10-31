@@ -16,6 +16,7 @@ Folder ini tidak ikut di zip rilis (`.gitattributes` export-ignore dan `.distign
 | `toko-e2e.php` | velocity-toko: total checkout di server, ongkir, DOKU, lacak, sinkron status |
 | `donasi-e2e.php` | velocity-donasi: invoice server, DOKU, Duitku callback |
 | `mp-e2e.php` | vd-marketplace + DOKU |
+| `admin-rest.php` | REST dashboard admin 0.3.0: izin & nonce, secret tidak keluar, nilai tidak valid ditolak, filter transaksi, cek status, log, formulir tanpa JS |
 | `checkout-js.mjs` | browser (Playwright): halaman checkout vd-store tanpa error JS saat COD mati, ongkir off, semua produk digital (regresi `isCodPayment`, vd-store 1.5.1); pembantunya `checkout-js-setup.php` + `mu-plugins/vdpg-checkout-js.php` |
 
 Suite plugin yang tidak terpasang akan gagal; jalankan hanya suite yang relevan.

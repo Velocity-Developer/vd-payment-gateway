@@ -777,21 +777,50 @@
   color: var(--vdpg-muted);
 }
 
-/* Filter transaksi */
+/* Filter transaksi (di atas tabel; badan kartu tabel tanpa padding) */
 .vdpg-filter {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin: 0 0 1rem;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--vdpg-border-soft);
 }
 
 .vdpg-wrap .vdpg-filter input[type="search"] {
-  flex: 1 1 220px;
-  min-height: 36px;
+  flex: 1 1 240px;
+  width: auto;
+  min-height: 38px;
   padding: 0 0.75rem;
   border: 1px solid var(--vdpg-border);
   border-radius: 0.5rem;
+}
+
+.vdpg-wrap .vdpg-filter select {
+  flex: 0 1 190px;
+  width: auto;
+}
+
+/* Channel panjang tanpa spasi (VIRTUAL_ACCOUNT_BRI) boleh terpotong baris agar tombol aksi tetap terlihat. */
+.vdpg-table td.vdpg-col-channel {
+  overflow-wrap: anywhere;
+  min-width: 90px;
+}
+
+.vdpg-table td.vdpg-col-action {
+  white-space: nowrap;
+}
+
+/* Pesan hasil simpan di samping tombol (pemberitahuan di atas bisa tidak terlihat bila halaman digulir). */
+.vdpg-inline-msg {
+  font-size: 13px;
+  font-weight: 600;
+  color: #15803d;
+}
+
+.vdpg-inline-msg.is-error {
+  color: #b91c1c;
 }
 
 .vdpg-pagination__info,
@@ -832,7 +861,7 @@
     font-size: 1.4rem;
   }
 
-  .vdpg-filter select,
+  .vdpg-wrap .vdpg-filter select,
   .vdpg-wrap .vdpg-filter input[type="search"] {
     flex: 1 1 100%;
     min-height: 44px;
