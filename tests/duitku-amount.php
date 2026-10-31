@@ -59,9 +59,11 @@ $c = $cb($inv2, '50000', '00');
 dcheck('Sukses dengan amount benar → paid', $c === 200 && vd_pg_get_transaction('duitku', $inv2)->status === 'paid', "http $c");
 
 echo "== velocity-toko (action lama velocity_duitku_callback)\n";
-if (!function_exists('velocitytoko_order_mark_paid')) {
-    dcheck('tema velocity-toko aktif', false);
+if (!class_exists('\\VToko\\Order')) {
+    dcheck('plugin velocity-toko aktif', false);
 } else {
+    // 1.4.0 (feat) mencatat ke log vd-payment-gateway & meneruskan pesanan vdpg; 1.3.5 (hotfix) hanya error_log.
+    $FEAT = function_exists('velocitytoko_pg_status_changed');
     $t = $wpdb->prefix . 'order';
     $detail = wp_json_encode(['email' => 'pembeli@example.com', 'subdistrict_destination' => '1', 'produk' => ['products' => []]]);
     $mk = function ($suffix) use ($wpdb, $t, $detail, $run) {
@@ -80,7 +82,7 @@ if (!function_exists('velocitytoko_order_mark_paid')) {
     dcheck('callback lama amount beda dari total: tidak Lunas', $status($o) === 'Transaksi Baru', $status($o));
     dcheck('email admin "nominal tidak sesuai" terkirim tepat 1x untuk 3 callback salah', $mails_to('VTA' . $run . ': nominal tidak sesuai') === 1, $mails_to('VTA' . $run . ': nominal tidak sesuai') . 'x');
     $log = $logf ? (string) file_get_contents($logf[0]) : '';
-    dcheck('log toko mencatat 3x status.amount_mismatch (source velocity-toko)', substr_count($log, '"source":"velocity-toko","invoice":"VTA' . $run . '"') === 3 && strpos($log, '"notified":"10000","billed":125000') !== false);
+    if ($FEAT) dcheck('log toko mencatat 3x status.amount_mismatch (source velocity-toko)', substr_count($log, '"source":"velocity-toko","invoice":"VTA' . $run . '"') === 3 && strpos($log, '"notified":"10000","billed":125000') !== false);
     $m = array_values(array_filter($GLOBALS['mails'], function ($m) use ($run) { return strpos((string) $m['subject'], 'VTA' . $run . ': nominal tidak sesuai') !== false; }));
     dcheck('email nominal kosong menyebut "tidak valid", bukan Rp 0', $m && strpos($m[0]['message'], 'Nominal dibayar: tidak valid') !== false, $m ? strip_tags($m[0]['message']) : '-');
     do_action('velocity_duitku_callback', ['merchantOrderId' => 'VTA' . $run, 'resultCode' => '00', 'amount' => '124999.5']);
@@ -89,13 +91,31 @@ if (!function_exists('velocitytoko_order_mark_paid')) {
     do_action('velocity_duitku_callback', ['merchantOrderId' => 'VTA' . $run, 'resultCode' => '00', 'amount' => '125000.00']);
     dcheck('callback lama amount = total → Lunas', $status($o) === 'Lunas', $status($o));
     dcheck('email lunas lama memakai nomor invoice & UTF-8', $mails_to('Invoice #VTA' . $run . ' telah dibayarkan') === 2 && stripos(implode('', (array) $GLOBALS['mails'][0]['headers']), 'charset=UTF-8') !== false, wp_json_encode(array_column($GLOBALS['mails'], 'subject')));
+    $GLOBALS['mails'] = [];
+    do_action('velocity_duitku_callback', ['merchantOrderId' => 'VTA' . $run, 'resultCode' => '00', 'amount' => '125000']);
+    dcheck('callback lunas ganda: tidak ada email kedua', count($GLOBALS['mails']) === 0 && $status($o) === 'Lunas', count($GLOBALS['mails']) . ' email');
 
-    // Pesanan toko yang dibayar lewat vd-payment-gateway: action lama untuk transaksi yang sama diabaikan.
+    // Status lanjutan tidak dimundurkan dan tidak memicu email walau nominal benar.
+    $sk = $mk('K');
+    $wpdb->update($t, ['status' => 'Sukses'], ['id' => $sk]);
+    $GLOBALS['mails'] = [];
+    do_action('velocity_duitku_callback', ['merchantOrderId' => 'VTK' . $run, 'resultCode' => '00', 'amount' => '125000']);
+    dcheck('pesanan Sukses + callback lunas benar: status tetap, tanpa email', $status($sk) === 'Sukses' && count($GLOBALS['mails']) === 0, $status($sk) . ', ' . count($GLOBALS['mails']) . ' email');
+
+    // Invoice berisi kutip (dulu disisipkan mentah ke SQL) tidak mengenai pesanan lain.
+    $q = $mk('Q');
+    $GLOBALS['php_warn'] = [];
+    do_action('velocity_duitku_callback', ['merchantOrderId' => "x' OR invoice LIKE 'VTQ%", 'resultCode' => '00', 'amount' => '125000']);
+    dcheck('invoice dengan kutip tidak mengenai pesanan lain', $status($q) === 'Transaksi Baru', $status($q));
+
+    // Pesanan toko yang dibayar lewat vd-payment-gateway: action lama untuk transaksi yang sama diabaikan (1.4.0).
     $p = $mk('P');
+    if ($FEAT) {
     (new \VdPaymentGateway\Transaction\TransactionRepository())->upsert_pending('duitku', 'VTP' . $run, ['source' => 'velocity-toko', 'ref_id' => (string) $p, 'amount' => 125000]);
     $GLOBALS['mails'] = [];
     do_action('velocity_duitku_callback', ['merchantOrderId' => 'VTP' . $run, 'resultCode' => '00', 'amount' => '1']);
     dcheck('action lama untuk pesanan lewat vdpg diabaikan (tanpa email/status)', count($GLOBALS['mails']) === 0 && $status($p) === 'Transaksi Baru', count($GLOBALS['mails']) . ' email, ' . $status($p));
+    }
     delete_option('velocitytoko_pg_mismatch_' . $p);
 
     // Pesanan yang sudah Lunas / berstatus lanjut: nominal salah tidak mengirim email palsu, status tetap.
