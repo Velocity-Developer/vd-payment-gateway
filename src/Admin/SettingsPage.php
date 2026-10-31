@@ -15,6 +15,7 @@ class SettingsPage
     public function register()
     {
         add_action('admin_menu', [$this, 'menu']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
         add_action('admin_post_vdpg_save', [$this, 'save']);
         add_action('admin_post_vdpg_sync', [$this, 'sync']);
         add_action('admin_post_vdpg_log', [$this, 'save_log']);
@@ -38,6 +39,14 @@ class SettingsPage
         return add_query_arg(array_merge(['page' => self::SLUG, 'tab' => $tab], $extra), admin_url('admin.php'));
     }
 
+    public function enqueue($hook)
+    {
+        if ($hook !== 'toplevel_page_' . self::SLUG) {
+            return;
+        }
+        wp_enqueue_style('vdpg-admin', VDPG_URL . 'assets/css/admin.css', [], VDPG_VERSION);
+    }
+
     public function render()
     {
         if (!current_user_can(self::CAPABILITY)) {
@@ -50,22 +59,32 @@ class SettingsPage
             $tab = (string) key($gateways);
         }
         ?>
-        <div class="wrap">
-            <h1><?php esc_html_e('Payment Gateway', 'vd-payment-gateway'); ?></h1>
-            <?php $this->notice(); ?>
-            <nav class="nav-tab-wrapper">
-                <?php foreach ($gateways as $id => $gateway) : ?>
-                    <a href="<?php echo esc_url($this->url($id)); ?>" class="nav-tab <?php echo $tab === $id ? 'nav-tab-active' : ''; ?>">
-                        <?php echo esc_html($gateway->label()); ?>
+        <div class="wrap vdpg-wrap">
+            <div class="vdpg-topnav">
+                <div class="vdpg-topnav__brand">
+                    <span class="vdpg-topnav__logo dashicons dashicons-money-alt" aria-hidden="true"></span>
+                    <h1 class="vdpg-topnav__title"><?php esc_html_e('Payment Gateway', 'vd-payment-gateway'); ?></h1>
+                    <span class="vdpg-topnav__version">v<?php echo esc_html(VDPG_VERSION); ?></span>
+                </div>
+                <nav class="vdpg-topnav__links" aria-label="<?php esc_attr_e('Navigasi Payment Gateway', 'vd-payment-gateway'); ?>">
+                    <?php foreach ($gateways as $id => $gateway) : ?>
+                        <a href="<?php echo esc_url($this->url($id)); ?>" class="vdpg-topnav__link<?php echo $tab === $id ? ' is-active' : ''; ?>"<?php echo $tab === $id ? ' aria-current="page"' : ''; ?>>
+                            <span class="vdpg-dot<?php echo $gateway->is_active() ? ' is-on' : ''; ?>" aria-hidden="true"></span>
+                            <?php echo esc_html($gateway->label()); ?>
+                        </a>
+                    <?php endforeach; ?>
+                    <a href="<?php echo esc_url($this->url('transactions')); ?>" class="vdpg-topnav__link<?php echo $tab === 'transactions' ? ' is-active' : ''; ?>"<?php echo $tab === 'transactions' ? ' aria-current="page"' : ''; ?>>
+                        <span class="dashicons dashicons-list-view" aria-hidden="true"></span>
+                        <?php esc_html_e('Transaksi', 'vd-payment-gateway'); ?>
                     </a>
-                <?php endforeach; ?>
-                <a href="<?php echo esc_url($this->url('transactions')); ?>" class="nav-tab <?php echo $tab === 'transactions' ? 'nav-tab-active' : ''; ?>">
-                    <?php esc_html_e('Transaksi', 'vd-payment-gateway'); ?>
-                </a>
-                <a href="<?php echo esc_url($this->url('log')); ?>" class="nav-tab <?php echo $tab === 'log' ? 'nav-tab-active' : ''; ?>">
-                    <?php esc_html_e('Log', 'vd-payment-gateway'); ?>
-                </a>
-            </nav>
+                    <a href="<?php echo esc_url($this->url('log')); ?>" class="vdpg-topnav__link<?php echo $tab === 'log' ? ' is-active' : ''; ?>"<?php echo $tab === 'log' ? ' aria-current="page"' : ''; ?>>
+                        <span class="dashicons dashicons-media-text" aria-hidden="true"></span>
+                        <?php esc_html_e('Log', 'vd-payment-gateway'); ?>
+                    </a>
+                </nav>
+            </div>
+            <hr class="wp-header-end">
+            <?php $this->notice(); ?>
             <?php
             if ($tab === 'transactions') {
                 $this->render_transactions();
@@ -75,6 +94,9 @@ class SettingsPage
                 $this->render_gateway($gateways[$tab]);
             }
             ?>
+            <div class="vdpg-footer">
+                <small>Powered by <a href="https://velocitydeveloper.com/" target="_blank" rel="noopener">velocitydeveloper.com</a></small>
+            </div>
         </div>
         <?php
     }
@@ -89,26 +111,74 @@ class SettingsPage
         printf('<div class="notice notice-%s is-dismissible"><p>%s</p></div>', esc_attr($type), esc_html($message));
     }
 
+    /** Kotak bergaya kartu dengan judul, subjudul, dan badge opsional. */
+    private function section_open($title, $subtitle = '', array $badges = [])
+    {
+        ?>
+        <div class="vdpg-section">
+            <div class="vdpg-section__header">
+                <div>
+                    <h2 class="vdpg-section__title"><?php echo esc_html($title); ?></h2>
+                    <?php if ($subtitle !== '') : ?>
+                        <p class="vdpg-section__subtitle"><?php echo esc_html($subtitle); ?></p>
+                    <?php endif; ?>
+                </div>
+                <?php if ($badges) : ?>
+                    <div class="vdpg-section__badges">
+                        <?php foreach ($badges as $badge) : ?>
+                            <span class="vdpg-badge vdpg-badge--<?php echo esc_attr($badge[0]); ?>"><?php echo esc_html($badge[1]); ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div class="vdpg-section__body">
+        <?php
+    }
+
+    private function section_close()
+    {
+        echo '</div></div>';
+    }
+
     private function render_gateway($gateway)
     {
         $options = method_exists($gateway, 'options') ? $gateway->options() : (array) get_option($gateway->option_name(), []);
+        $badges = [$gateway->is_active() ? ['success', __('Aktif', 'vd-payment-gateway')] : ['muted', __('Nonaktif', 'vd-payment-gateway')]];
+        if (!empty($options['mode'])) {
+            $badges[] = $options['mode'] === 'production' ? ['info', 'Production'] : ['warning', 'Sandbox'];
+        }
         ?>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
             <input type="hidden" name="action" value="vdpg_save">
             <input type="hidden" name="gateway" value="<?php echo esc_attr($gateway->id()); ?>">
             <?php wp_nonce_field('vdpg_save_' . $gateway->id()); ?>
-            <table class="form-table" role="presentation">
+            <?php $this->section_open(
+                /* translators: %s: nama gateway */
+                sprintf(__('Pengaturan %s', 'vd-payment-gateway'), $gateway->label()),
+                __('Kredensial dan perilaku pembayaran. Gateway hanya dipakai bila aktif dan kredensial lengkap.', 'vd-payment-gateway'),
+                $badges
+            ); ?>
                 <?php foreach ($gateway->settings_fields() as $key => $field) :
                     $name = 'vdpg[' . $key . ']';
                     $id = 'vdpg_' . $gateway->id() . '_' . $key;
                     $value = $options[$key] ?? '';
                     ?>
-                    <tr>
-                        <th scope="row"><label for="<?php echo esc_attr($id); ?>"><?php echo esc_html($field['label']); ?></label></th>
-                        <td>
+                    <div class="vdpg-form-group vdpg-form-group--<?php echo esc_attr($field['type']); ?>">
+                        <div class="vdpg-form-left">
+                            <label class="vdpg-form-label" for="<?php echo esc_attr($id); ?>"><?php echo esc_html($field['label']); ?></label>
+                            <?php if (!empty($field['hint'])) : ?>
+                                <small class="vdpg-form-hint"><?php echo esc_html($field['hint']); ?></small>
+                            <?php endif; ?>
+                        </div>
+                        <div class="vdpg-form-right">
                             <?php switch ($field['type']) {
                                 case 'checkbox':
-                                    printf('<input type="checkbox" id="%s" name="%s" value="1" %s>', esc_attr($id), esc_attr($name), checked($value, '1', false));
+                                    printf(
+                                        '<label class="vdpg-switch"><input type="checkbox" id="%s" name="%s" value="1" %s><span class="vdpg-switch__slider" aria-hidden="true"></span></label>',
+                                        esc_attr($id),
+                                        esc_attr($name),
+                                        checked($value, '1', false)
+                                    );
                                     break;
                                 case 'select':
                                     printf('<select id="%s" name="%s">', esc_attr($id), esc_attr($name));
@@ -130,24 +200,19 @@ class SettingsPage
                                     break;
                                 default:
                                     printf('<input type="text" class="regular-text" id="%s" name="%s" value="%s">', esc_attr($id), esc_attr($name), esc_attr($value));
-                            }
-                            if (!empty($field['hint'])) {
-                                printf('<p class="description">%s</p>', esc_html($field['hint']));
                             } ?>
-                        </td>
-                    </tr>
+                        </div>
+                    </div>
                 <?php endforeach; ?>
-                <?php if (method_exists($gateway, 'notification_url')) : ?>
-                    <tr>
-                        <th scope="row"><?php esc_html_e('Notification URL', 'vd-payment-gateway'); ?></th>
-                        <td>
-                            <code><?php echo esc_html($gateway->notification_url()); ?></code>
-                            <p class="description"><?php esc_html_e('Isikan URL ini di Back Office gateway (menu Integration / Notification).', 'vd-payment-gateway'); ?></p>
-                        </td>
-                    </tr>
-                <?php endif; ?>
-            </table>
-            <?php submit_button(__('Simpan Perubahan', 'vd-payment-gateway')); ?>
+            <?php $this->section_close(); ?>
+            <?php if (method_exists($gateway, 'notification_url')) : ?>
+                <?php $this->section_open(__('Notification URL', 'vd-payment-gateway'), __('Isikan URL ini di Back Office gateway (menu Integration / Notification).', 'vd-payment-gateway')); ?>
+                    <code class="vdpg-code"><?php echo esc_html($gateway->notification_url()); ?></code>
+                <?php $this->section_close(); ?>
+            <?php endif; ?>
+            <div class="vdpg-actions">
+                <?php submit_button(__('Simpan Perubahan', 'vd-payment-gateway'), 'primary', 'submit', false); ?>
+            </div>
         </form>
         <?php
     }
@@ -239,24 +304,52 @@ class SettingsPage
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
             <input type="hidden" name="action" value="vdpg_log">
             <?php wp_nonce_field('vdpg_log'); ?>
-            <table class="form-table" role="presentation">
-                <tr>
-                    <th scope="row"><label for="vdpg_log_enabled"><?php esc_html_e('Log debug', 'vd-payment-gateway'); ?></label></th>
-                    <td>
-                        <input type="checkbox" id="vdpg_log_enabled" name="enabled" value="1" <?php checked(Logger::enabled()); ?>>
-                        <?php esc_html_e('Catat permintaan ke API gateway, notifikasi masuk, dan perubahan status.', 'vd-payment-gateway'); ?>
-                        <p class="description"><?php printf(esc_html__('Secret key dan signature disamarkan. Berkas disimpan %d hari di uploads/vdpg-logs/. Matikan lagi setelah selesai pengecekan.', 'vd-payment-gateway'), Logger::LOG_DAYS); ?></p>
-                    </td>
-                </tr>
-            </table>
-            <p>
+            <?php $this->section_open(
+                __('Log debug', 'vd-payment-gateway'),
+                '',
+                [Logger::enabled() ? ['warning', __('Mencatat', 'vd-payment-gateway')] : ['muted', __('Mati', 'vd-payment-gateway')]]
+            ); ?>
+                <div class="vdpg-form-group vdpg-form-group--checkbox">
+                    <div class="vdpg-form-left">
+                        <label class="vdpg-form-label" for="vdpg_log_enabled"><?php esc_html_e('Catat permintaan ke API gateway, notifikasi masuk, dan perubahan status.', 'vd-payment-gateway'); ?></label>
+                        <small class="vdpg-form-hint" id="vdpg_log_enabled_hint"><?php printf(esc_html__('Secret key dan signature disamarkan. Berkas disimpan %d hari di uploads/vdpg-logs/. Matikan lagi setelah selesai pengecekan.', 'vd-payment-gateway'), Logger::LOG_DAYS); ?></small>
+                    </div>
+                    <div class="vdpg-form-right">
+                        <label class="vdpg-switch">
+                            <input type="checkbox" id="vdpg_log_enabled" name="enabled" value="1" aria-describedby="vdpg_log_enabled_hint" <?php checked(Logger::enabled()); ?>>
+                            <span class="vdpg-switch__slider" aria-hidden="true"></span>
+                        </label>
+                    </div>
+                </div>
+            <?php $this->section_close(); ?>
+            <div class="vdpg-actions">
                 <?php submit_button(__('Simpan', 'vd-payment-gateway'), 'primary', 'submit', false); ?>
                 <?php submit_button(__('Hapus semua log', 'vd-payment-gateway'), 'delete', 'clear', false, ['onclick' => "return confirm('Hapus semua log?');"]); ?>
-            </p>
+            </div>
         </form>
-        <h2><?php printf(esc_html__('%d baris terakhir', 'vd-payment-gateway'), count($lines)); ?></h2>
-        <textarea readonly class="large-text code" rows="25" style="white-space:pre;font-size:12px"><?php echo esc_textarea(implode("\n", $lines)); ?></textarea>
+        <?php $this->section_open(sprintf(__('%d baris terakhir', 'vd-payment-gateway'), count($lines))); ?>
+            <textarea readonly class="large-text code vdpg-log" rows="25" aria-label="<?php esc_attr_e('Isi log', 'vd-payment-gateway'); ?>"><?php echo esc_textarea(implode("\n", $lines)); ?></textarea>
+        <?php $this->section_close(); ?>
         <?php
+    }
+
+    /** Kelas badge dan label untuk status transaksi (hanya tampilan). */
+    private function status_badge($status)
+    {
+        $map = [
+            'paid' => ['success', __('Lunas', 'vd-payment-gateway')],
+            'pending' => ['warning', __('Menunggu', 'vd-payment-gateway')],
+            'expired' => ['muted', __('Kedaluwarsa', 'vd-payment-gateway')],
+            'failed' => ['danger', __('Gagal', 'vd-payment-gateway')],
+            'refunded' => ['info', __('Refund', 'vd-payment-gateway')],
+        ];
+        $badge = $map[$status] ?? ['muted', (string) $status];
+        printf(
+            '<span class="vdpg-badge vdpg-badge--%s" title="%s">%s</span>',
+            esc_attr($badge[0]),
+            esc_attr($status),
+            esc_html($badge[1])
+        );
     }
 
     private function render_transactions()
@@ -264,59 +357,75 @@ class SettingsPage
         $paged = max(1, isset($_GET['paged']) ? (int) $_GET['paged'] : 1);
         $per_page = 50;
         $rows = (new TransactionRepository())->latest($per_page, ($paged - 1) * $per_page);
+        $columns = [
+            'invoice' => __('Invoice', 'vd-payment-gateway'),
+            'gateway' => __('Gateway', 'vd-payment-gateway'),
+            'source' => __('Sumber', 'vd-payment-gateway'),
+            'amount' => __('Jumlah', 'vd-payment-gateway'),
+            'status' => __('Status', 'vd-payment-gateway'),
+            'channel' => __('Channel', 'vd-payment-gateway'),
+            'created' => __('Dibuat (UTC)', 'vd-payment-gateway'),
+            'paid' => __('Lunas (UTC)', 'vd-payment-gateway'),
+        ];
+        $this->section_open(
+            __('Transaksi', 'vd-payment-gateway'),
+            /* translators: %d: nomor halaman */
+            sprintf(__('Transaksi terbaru dari semua gateway. Halaman %d.', 'vd-payment-gateway'), $paged)
+        );
         ?>
-        <table class="widefat striped" style="margin-top:1em">
-            <thead>
-                <tr>
-                    <th><?php esc_html_e('Invoice', 'vd-payment-gateway'); ?></th>
-                    <th><?php esc_html_e('Gateway', 'vd-payment-gateway'); ?></th>
-                    <th><?php esc_html_e('Sumber', 'vd-payment-gateway'); ?></th>
-                    <th><?php esc_html_e('Jumlah', 'vd-payment-gateway'); ?></th>
-                    <th><?php esc_html_e('Status', 'vd-payment-gateway'); ?></th>
-                    <th><?php esc_html_e('Channel', 'vd-payment-gateway'); ?></th>
-                    <th><?php esc_html_e('Dibuat (UTC)', 'vd-payment-gateway'); ?></th>
-                    <th><?php esc_html_e('Lunas (UTC)', 'vd-payment-gateway'); ?></th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($rows)) : ?>
-                    <tr><td colspan="9"><?php esc_html_e('Belum ada transaksi.', 'vd-payment-gateway'); ?></td></tr>
-                <?php endif; ?>
-                <?php foreach ($rows as $row) : ?>
+        <div class="vdpg-table-wrap">
+            <table class="vdpg-table">
+                <thead>
                     <tr>
-                        <td><?php echo esc_html($row->invoice); ?></td>
-                        <td><?php echo esc_html($row->gateway); ?></td>
-                        <td><?php echo esc_html(trim($row->source . ' #' . $row->ref_id, ' #')); ?></td>
-                        <td><?php echo esc_html(number_format_i18n((int) $row->amount)); ?></td>
-                        <td>
-                            <strong><?php echo esc_html($row->status); ?></strong>
-                            <?php if (!empty($row->note)) : ?>
-                                <br><span style="color:<?php echo $row->source === 'legacy-import' ? '#646970' : '#b32d2e'; ?>"><?php echo esc_html($row->note); ?></span>
-                            <?php endif; ?>
-                        </td>
-                        <td><?php echo esc_html($row->channel); ?></td>
-                        <td><?php echo esc_html($row->created_at); ?></td>
-                        <td><?php echo esc_html((string) $row->paid_at); ?></td>
-                        <td>
-                            <?php if ($row->status === 'pending') : ?>
-                                <a class="button button-small" href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=vdpg_sync&id=' . (int) $row->id), 'vdpg_sync_' . (int) $row->id)); ?>">
-                                    <?php esc_html_e('Cek status', 'vd-payment-gateway'); ?>
-                                </a>
-                            <?php endif; ?>
-                        </td>
+                        <?php foreach ($columns as $key => $label) : ?>
+                            <th scope="col" class="vdpg-col-<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></th>
+                        <?php endforeach; ?>
+                        <th scope="col" class="vdpg-col-action"><span class="screen-reader-text"><?php esc_html_e('Aksi', 'vd-payment-gateway'); ?></span></th>
                     </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-        <p>
-            <?php if ($paged > 1) : ?>
-                <a class="button" href="<?php echo esc_url($this->url('transactions', ['paged' => $paged - 1])); ?>">&laquo;</a>
-            <?php endif; ?>
-            <?php if (count($rows) === $per_page) : ?>
-                <a class="button" href="<?php echo esc_url($this->url('transactions', ['paged' => $paged + 1])); ?>">&raquo;</a>
-            <?php endif; ?>
-        </p>
+                </thead>
+                <tbody>
+                    <?php if (empty($rows)) : ?>
+                        <tr class="vdpg-table__empty"><td colspan="9"><?php esc_html_e('Belum ada transaksi.', 'vd-payment-gateway'); ?></td></tr>
+                    <?php endif; ?>
+                    <?php foreach ($rows as $row) : ?>
+                        <tr>
+                            <td class="vdpg-col-invoice" data-label="<?php echo esc_attr($columns['invoice']); ?>"><strong><?php echo esc_html($row->invoice); ?></strong></td>
+                            <td class="vdpg-col-gateway" data-label="<?php echo esc_attr($columns['gateway']); ?>"><span class="vdpg-chip"><?php echo esc_html($row->gateway); ?></span></td>
+                            <td class="vdpg-col-source" data-label="<?php echo esc_attr($columns['source']); ?>"><?php echo esc_html(trim($row->source . ' #' . $row->ref_id, ' #')); ?></td>
+                            <td class="vdpg-col-amount" data-label="<?php echo esc_attr($columns['amount']); ?>"><?php echo esc_html(number_format_i18n((int) $row->amount)); ?></td>
+                            <td class="vdpg-col-status" data-label="<?php echo esc_attr($columns['status']); ?>">
+                                <?php $this->status_badge($row->status); ?>
+                                <?php if (!empty($row->note)) : ?>
+                                    <span class="vdpg-note<?php echo $row->source === 'legacy-import' ? '' : ' vdpg-note--alert'; ?>"><?php echo esc_html($row->note); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td class="vdpg-col-channel" data-label="<?php echo esc_attr($columns['channel']); ?>"><?php echo esc_html($row->channel); ?></td>
+                            <td class="vdpg-col-created" data-label="<?php echo esc_attr($columns['created']); ?>"><?php echo esc_html($row->created_at); ?></td>
+                            <td class="vdpg-col-paid" data-label="<?php echo esc_attr($columns['paid']); ?>"><?php echo esc_html((string) $row->paid_at); ?></td>
+                            <td class="vdpg-col-action">
+                                <?php if ($row->status === 'pending') : ?>
+                                    <a class="button button-small vdpg-btn-sync" href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=vdpg_sync&id=' . (int) $row->id), 'vdpg_sync_' . (int) $row->id)); ?>">
+                                        <span class="dashicons dashicons-update" aria-hidden="true"></span>
+                                        <?php esc_html_e('Cek status', 'vd-payment-gateway'); ?>
+                                    </a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php $this->section_close(); ?>
+        <?php if ($paged > 1 || count($rows) === $per_page) : ?>
+            <div class="vdpg-actions vdpg-pagination">
+                <?php if ($paged > 1) : ?>
+                    <a class="button" href="<?php echo esc_url($this->url('transactions', ['paged' => $paged - 1])); ?>">&laquo; <?php esc_html_e('Sebelumnya', 'vd-payment-gateway'); ?></a>
+                <?php endif; ?>
+                <?php if (count($rows) === $per_page) : ?>
+                    <a class="button" href="<?php echo esc_url($this->url('transactions', ['paged' => $paged + 1])); ?>"><?php esc_html_e('Berikutnya', 'vd-payment-gateway'); ?> &raquo;</a>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
         <?php
     }
 }
