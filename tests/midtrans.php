@@ -83,6 +83,7 @@ $t = vd_pg_get_transaction('midtrans', $inv);
 mcheck('channel bank_transfer:bca tercatat', $t && $t->channel === 'bank_transfer:bca', $t ? $t->channel : '');
 mcheck('notifikasi ganda tetap 200, status paid', $notify($p) === 200 && $st($inv) === 'paid');
 mcheck('expire setelah paid tidak menurunkan status', $notify($payload($inv, 'expire', '175000.00')) === 200 && $st($inv) === 'paid');
+mcheck('partial_refund: tetap paid', $notify($payload($inv, 'partial_refund', '175000.00')) === 200 && $st($inv) === 'paid');
 mcheck('refund → refunded', $notify($payload($inv, 'refund', '175000.00')) === 200 && $st($inv) === 'refunded');
 
 $inv2 = "MT-$run-2";

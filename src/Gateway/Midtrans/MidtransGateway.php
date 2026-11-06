@@ -342,8 +342,11 @@ class MidtransGateway implements GatewayInterface
                 $status = 'expired';
                 break;
             case 'refund':
-            case 'partial_refund':
                 $status = 'refunded';
+                break;
+            case 'partial_refund':
+                // Refund sebagian: transaksi tetap lunas (status refunded final); payload tetap tersimpan.
+                $status = 'paid';
                 break;
             case 'cancel':
             case 'failure':

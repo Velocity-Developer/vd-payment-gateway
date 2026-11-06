@@ -21,7 +21,7 @@ Notification URL (`/wp-json/vd-pg/v1/notify/midtrans`) dikirim otomatis per tran
 `X-Override-Notification`, jadi tidak wajib diisi di dashboard Midtrans. Notifikasi diverifikasi dengan
 `signature_key` (SHA512 order_id + status_code + gross_amount + Server Key). Pemetaan status:
 `settlement` / `capture`+`accept` → lunas, `capture`+`challenge` / `pending` / `deny` → menunggu,
-`expire` → kedaluwarsa, `cancel` / `failure` → gagal, `refund` / `partial_refund` → refund.
+`expire` → kedaluwarsa, `cancel` / `failure` → gagal, `refund` → refund, `partial_refund` → tetap lunas (payload tersimpan).
 Invoice Midtrans maksimal 50 karakter (huruf, angka, `- _ ~ .`).
 
 Tab **Transaksi** menampilkan kartu statistik (lunas, menunggu, kedaluwarsa, gagal), pencarian invoice/referensi,
