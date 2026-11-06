@@ -23,6 +23,7 @@ Notification URL (`/wp-json/vd-pg/v1/notify/midtrans`) dikirim otomatis per tran
 `settlement` / `capture`+`accept` → lunas, `capture`+`challenge` / `pending` / `deny` → menunggu,
 `expire` → kedaluwarsa, `cancel` / `failure` → gagal, `refund` → refund, `partial_refund` → tetap lunas (payload tersimpan).
 Invoice Midtrans maksimal 50 karakter (huruf, angka, `- _ ~ .`).
+`chargeback` belum didukung (transaksi lunas tidak berubah, payload tetap tersimpan).
 
 Tab **Transaksi** menampilkan kartu statistik (lunas, menunggu, kedaluwarsa, gagal), pencarian invoice/referensi,
 filter status dan gateway, serta tombol **Cek status** (memanggil API cek status gateway).

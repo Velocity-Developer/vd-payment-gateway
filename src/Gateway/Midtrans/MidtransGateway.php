@@ -294,6 +294,14 @@ class MidtransGateway implements GatewayInterface
             ];
         }
 
+        // Respons lain (401/5xx di body, dsb.) tanpa transaction_status bukan status transaksi.
+        if ((string) ($result['transaction_status'] ?? '') === '') {
+            return new \WP_Error('vdpg_midtrans_api', sprintf(__('Midtrans tidak mengembalikan status transaksi: %s', 'vd-payment-gateway'), (string) ($result['status_message'] ?? ($result['status_code'] ?? 'tanpa pesan'))), $result);
+        }
+        if ((string) ($result['order_id'] ?? '') !== (string) $invoice) {
+            return new \WP_Error('vdpg_midtrans_api', __('Respons Midtrans untuk invoice lain.', 'vd-payment-gateway'), $result);
+        }
+
         return $this->normalize_payload($result);
     }
 
@@ -353,7 +361,7 @@ class MidtransGateway implements GatewayInterface
                 $status = 'failed';
                 break;
             default:
-                // pending, authorize, deny (pelanggan masih bisa mencoba metode lain di halaman Snap).
+                // pending, authorize, chargeback (belum didukung, tidak mengubah transaksi lunas), deny (pelanggan masih bisa mencoba metode lain di halaman Snap).
                 $status = 'pending';
         }
 
@@ -412,7 +420,8 @@ class MidtransGateway implements GatewayInterface
             'mode' => $options['mode'],
             'method' => $method,
             'path' => (string) wp_parse_url($url, PHP_URL_PATH),
-            'headers' => $headers,
+            // Authorization tidak dicatat sama sekali: penyamaran menyisakan ujung base64 Server Key.
+            'headers' => array_diff_key($headers, ['Authorization' => 1]),
             'body' => $body,
             'ms' => (int) round((microtime(true) - $started) * 1000),
         ];

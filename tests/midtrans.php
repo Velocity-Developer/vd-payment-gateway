@@ -107,10 +107,16 @@ $GLOBALS['status_reply'] = ['status_code' => '200', 'transaction_status' => 'set
 $s = vd_pg_sync_status('midtrans', $inv4);
 mcheck('cek status settlement → paid, channel qris:gopay', !is_wp_error($s) && $st($inv4) === 'paid' && vd_pg_get_transaction('midtrans', $inv4)->channel === 'qris:gopay');
 
+$GLOBALS['status_reply'] = ['status_code' => '401', 'status_message' => 'Unauthorized'];
+$s = vd_pg_sync_status('midtrans', $inv4);
+mcheck('cek status tanpa transaction_status → WP_Error', is_wp_error($s));
+$GLOBALS['status_reply'] = ['status_code' => '200', 'transaction_status' => 'expire', 'order_id' => 'LAIN-1', 'gross_amount' => '30000.00'];
+mcheck('cek status order_id lain → WP_Error', is_wp_error(vd_pg_sync_status('midtrans', $inv4)));
+
 echo "== Midtrans: log & pengaturan\n";
 $logf = \VdPaymentGateway\Logger::files();
 $log = $logf ? (string) file_get_contents($logf[0]) : '';
-mcheck('server key tidak tertulis di log', strpos($log, $skey) === false && strpos($log, base64_encode($skey . ':')) === false);
+mcheck('server key & header Authorization tidak tertulis di log', strpos($log, $skey) === false && strpos($log, base64_encode($skey . ':')) === false && stripos($log, '"authorization"') === false && strpos($log, 'Basi') === false);
 $pub = \VdPaymentGateway\Admin\SettingsPage::public_settings(vd_pg_gateway('midtrans'));
 mcheck('server key tidak dikirim ke browser', strpos(wp_json_encode($pub), $skey) === false);
 update_option('vdpg_midtrans', ['enabled' => '1', 'mode' => 'sandbox', 'server_key' => '']);
