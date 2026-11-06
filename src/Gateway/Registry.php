@@ -4,6 +4,7 @@ namespace VdPaymentGateway\Gateway;
 
 use VdPaymentGateway\Gateway\Doku\DokuGateway;
 use VdPaymentGateway\Gateway\Duitku\DuitkuGateway;
+use VdPaymentGateway\Gateway\Midtrans\MidtransGateway;
 
 class Registry
 {
@@ -19,6 +20,7 @@ class Registry
         $gateways = [
             'doku' => new DokuGateway(),
             'duitku' => new DuitkuGateway(),
+            'midtrans' => new MidtransGateway(),
         ];
 
         $gateways = apply_filters('vd_pg_gateways', $gateways);

@@ -12,7 +12,7 @@ if [ -z "${WP_CLI:-}" ]; then
     if [ -f "$WP/../wp" ]; then WP_CLI="php $(cd "$WP/.." && pwd)/wp"; else WP_CLI=wp; fi
 fi
 SUITES=("$@")
-[ ${#SUITES[@]} -eq 0 ] && SUITES=(toko-e2e log-mask e2e mp-e2e donasi-e2e duitku-amount checkout-js admin-rest)
+[ ${#SUITES[@]} -eq 0 ] && SUITES=(toko-e2e log-mask e2e mp-e2e donasi-e2e duitku-amount midtrans checkout-js admin-rest)
 
 if [ ! -f "$WP/wp-load.php" ]; then
     echo "WordPress uji tidak ditemukan di $WP (atur VDPG_TEST_WP)." >&2

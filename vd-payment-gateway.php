@@ -2,8 +2,8 @@
 
 /**
  * Plugin Name: VD Payment Gateway
- * Description: Payment gateway terpusat (DOKU, Duitku) untuk plugin dan theme Velocity Developer.
- * Version:     0.3.0
+ * Description: Payment gateway terpusat (DOKU, Duitku, Midtrans) untuk plugin dan theme Velocity Developer.
+ * Version:     0.4.0
  * Author:      Dev Team Velocitydeveloper.com
  * Author URI:  https://velocitydeveloper.com
  * Text Domain: vd-payment-gateway
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('VDPG_VERSION', '0.3.0');
+define('VDPG_VERSION', '0.4.0');
 define('VDPG_FILE', __FILE__);
 define('VDPG_PATH', plugin_dir_path(__FILE__));
 define('VDPG_URL', plugin_dir_url(__FILE__));

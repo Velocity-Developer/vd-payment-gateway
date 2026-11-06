@@ -3,7 +3,7 @@
 Plugin payment gateway terpusat untuk plugin/theme Velocity Developer (vd-store, vd-marketplace, velocity-donasi, velocity-toko).
 Gateway ditulis sekali di sini; plugin lain cukup memanggil API di bawah.
 
-Gateway: **DOKU Checkout** (Non-SNAP) dan **Duitku Pop**.
+Gateway: **DOKU Checkout** (Non-SNAP), **Duitku Pop**, dan **Midtrans Snap**.
 
 ## Pengaturan
 
@@ -14,6 +14,15 @@ Menu **Payment Gateway → DOKU** di wp-admin:
 
 Menu **Payment Gateway → Duitku**: Aktifkan, Mode, Kode Merchant, API Key, batas bayar, Return URL bawaan.
 Callback URL dikirim otomatis per transaksi (`/wp-json/vd-pg/v1/notify/duitku`), tidak perlu diisi di dashboard Duitku.
+
+Menu **Payment Gateway → Midtrans**: Aktifkan, Mode, Merchant ID, Client Key, Server Key, batas bayar, dan
+(opsional) daftar metode yang ditampilkan (`enabled_payments`, mis. `bca_va,bni_va,gopay,other_qris`).
+Notification URL (`/wp-json/vd-pg/v1/notify/midtrans`) dikirim otomatis per transaksi lewat header
+`X-Override-Notification`, jadi tidak wajib diisi di dashboard Midtrans. Notifikasi diverifikasi dengan
+`signature_key` (SHA512 order_id + status_code + gross_amount + Server Key). Pemetaan status:
+`settlement` / `capture`+`accept` → lunas, `capture`+`challenge` / `pending` / `deny` → menunggu,
+`expire` → kedaluwarsa, `cancel` / `failure` → gagal, `refund` / `partial_refund` → refund.
+Invoice Midtrans maksimal 50 karakter (huruf, angka, `- _ ~ .`).
 
 Tab **Transaksi** menampilkan kartu statistik (lunas, menunggu, kedaluwarsa, gagal), pencarian invoice/referensi,
 filter status dan gateway, serta tombol **Cek status** (memanggil API cek status gateway).
@@ -56,7 +65,7 @@ Dipicu **sekali** per perubahan status (notifikasi ganda diabaikan):
 - `vd_pg_payment_status_changed` — `($transaction, $status, $payload)`
 - `vd_pg_payment_amount_mismatch` — nominal notifikasi ≠ nominal tagihan; transaksi **tidak** ditandai lunas.
 
-Filter: `vd_pg_gateways` (daftarkan gateway baru, implementasi `GatewayInterface`), `vd_pg_doku_payment_body`.
+Filter: `vd_pg_gateways` (daftarkan gateway baru, implementasi `GatewayInterface`), `vd_pg_doku_payment_body`, `vd_pg_midtrans_snap_body`.
 
 ## Kompatibilitas Duitku lama (velocity-addons < 2.3)
 
