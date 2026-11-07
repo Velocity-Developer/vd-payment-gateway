@@ -79,14 +79,20 @@ class SettingsPage
         if ($tab === '' || !isset($this->tabs()[$tab]) || $this->page_slug($tab) === self::SLUG) {
             return;
         }
-        $args = array_map('rawurlencode', array_filter(array_diff_key(wp_unslash($_GET), ['page' => 1, 'tab' => 1]), 'is_scalar'));
+        $args = array_filter(array_diff_key(wp_unslash($_GET), ['page' => 1, 'tab' => 1]), 'is_scalar');
         wp_safe_redirect($this->url($tab, $args));
         exit;
     }
 
     private function url($tab, array $extra = [])
     {
-        return add_query_arg(array_merge(['page' => $this->page_slug($tab)], $extra), admin_url('admin.php'));
+        // add_query_arg tidak meng-encode; kunci dan nilai di-encode di sini supaya "&" dll. tidak memecah query.
+        $query = ['page' => $this->page_slug($tab)];
+        foreach ($extra as $key => $value) {
+            $query[rawurlencode((string) $key)] = rawurlencode((string) $value);
+        }
+
+        return add_query_arg($query, admin_url('admin.php'));
     }
 
     /** Tab yang sedang dibuka, dari slug halaman (atau ?tab= pada halaman induk). */

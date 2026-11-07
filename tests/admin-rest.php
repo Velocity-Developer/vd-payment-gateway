@@ -178,6 +178,9 @@ try {
     $loc = (string) wp_remote_retrieve_header($r, 'location');
     ar_check('URL lama ?tab=transactions dialihkan ke submenu, filter ikut', wp_remote_retrieve_response_code($r) === 302
         && strpos($loc, 'page=vd-payment-gateway-transactions') !== false && strpos($loc, 'status=paid') !== false && strpos($loc, 'tab=') === false, $loc);
+    $r = wp_remote_get(admin_url('admin.php?page=vd-payment-gateway&tab=log&x%26evil=1&s=a%20b%26c'), ['cookies' => $cookies, 'redirection' => 0, 'timeout' => 20]);
+    $loc = (string) wp_remote_retrieve_header($r, 'location');
+    ar_check('redirect URL lama meng-encode kunci & nilai (tidak ada parameter sisipan)', strpos($loc, '&evil=') === false && strpos($loc, 'x%26evil=1') !== false && strpos($loc, 's=a%20b%26c') !== false, $loc);
     $r = wp_remote_get(admin_url('admin.php?page=vd-payment-gateway&tab=doku'), ['cookies' => $cookies, 'redirection' => 0, 'timeout' => 20]);
     ar_check('URL lama ?tab=doku (tab pertama) tidak dialihkan', wp_remote_retrieve_response_code($r) === 200);
     $html = wp_remote_retrieve_body(wp_remote_get(admin_url('admin.php?page=vd-payment-gateway-midtrans'), ['cookies' => $cookies, 'timeout' => 20]));
