@@ -83,27 +83,28 @@ class MidtransGateway implements GatewayInterface
             'mode' => [
                 'type' => 'select',
                 'label' => __('Mode', 'vd-payment-gateway'),
+                'hint' => __('Sandbox untuk uji coba, Production untuk transaksi sungguhan. Semua kunci di bawah harus diambil dari mode yang sama di akun Midtrans.', 'vd-payment-gateway'),
                 'choices' => ['sandbox' => 'Sandbox', 'production' => 'Production'],
             ],
             'merchant_id' => [
                 'type' => 'text',
                 'label' => 'Merchant ID',
-                'hint' => __('Dashboard Midtrans > Settings > Access Keys. Hanya untuk catatan.', 'vd-payment-gateway'),
+                'hint' => __('Opsional, hanya untuk catatan (tidak dipakai saat transaksi). Kode akun Midtrans, biasanya juga menjadi awalan nama kunci bawaan, mis. M123456789.', 'vd-payment-gateway'),
             ],
             'client_key' => [
                 'type' => 'text',
                 'label' => 'Client Key',
-                'hint' => __('Dashboard Midtrans > Settings > Access Keys (awalan SB-Mid-client- untuk sandbox).', 'vd-payment-gateway'),
+                'hint' => __('Kunci publik dari halaman kunci akses (Access Keys) akun Midtrans.', 'vd-payment-gateway'),
             ],
             'server_key' => [
                 'type' => 'secret',
                 'label' => 'Server Key',
-                'hint' => __('Kosongkan bila tidak ingin mengubah Server Key yang tersimpan.', 'vd-payment-gateway'),
+                'hint' => __('Wajib. Kunci rahasia untuk membuat transaksi, dari halaman kunci akses akun Midtrans. Isi dengan nilai kuncinya, bukan nama kuncinya. Kosongkan bila tidak ingin mengubah nilai tersimpan.', 'vd-payment-gateway'),
             ],
             'signature_key' => [
                 'type' => 'secret',
                 'label' => 'Signature Secret Key',
-                'hint' => __('Dashboard Midtrans > Settings > Access Keys (akun baru). Untuk verifikasi notifikasi; bila kosong dipakai Server Key. Kosongkan bila tidak ingin mengubah nilai tersimpan.', 'vd-payment-gateway'),
+                'hint' => __('Wajib bila akun Midtrans memilikinya. Dipakai untuk memastikan notifikasi pembayaran benar dari Midtrans; tanpa ini status pesanan tidak berubah otomatis. Bila akun tidak memilikinya, kosongkan (Server Key yang dipakai). Kosongkan juga bila tidak ingin mengubah nilai tersimpan.', 'vd-payment-gateway'),
             ],
             'expiry' => [
                 'type' => 'number',
