@@ -14,6 +14,9 @@ class SettingsPage
     /** Versi Alpine.js di assets/vendor/alpinejs (lihat README.md di folder itu). */
     const ALPINE_VERSION = '3.14.8';
 
+    /** Hook halaman admin plugin ini (untuk memuat aset hanya di halaman ini). */
+    private $hooks = [];
+
     public function register()
     {
         add_action('admin_menu', [$this, 'menu']);
@@ -23,9 +26,27 @@ class SettingsPage
         add_action('admin_post_vdpg_log', [$this, 'save_log']);
     }
 
+    /** Daftar tab: id gateway, lalu transaksi dan log. Tab pertama memakai slug induk. */
+    private function tabs()
+    {
+        $tabs = [];
+        foreach (Plugin::instance()->registry()->all() as $id => $gateway) {
+            $tabs[$id] = $gateway->label();
+        }
+        $tabs['transactions'] = __('Transaksi', 'vd-payment-gateway');
+        $tabs['log'] = __('Log', 'vd-payment-gateway');
+
+        return $tabs;
+    }
+
+    private function page_slug($tab)
+    {
+        return $tab === (string) key($this->tabs()) ? self::SLUG : self::SLUG . '-' . $tab;
+    }
+
     public function menu()
     {
-        add_menu_page(
+        $this->hooks[] = add_menu_page(
             __('Payment Gateway', 'vd-payment-gateway'),
             __('Payment Gateway', 'vd-payment-gateway'),
             self::CAPABILITY,
@@ -34,16 +55,64 @@ class SettingsPage
             'dashicons-money-alt',
             58
         );
+        foreach ($this->tabs() as $tab => $label) {
+            $hook = add_submenu_page(
+                self::SLUG,
+                /* translators: %s: nama submenu */
+                sprintf(__('Payment Gateway: %s', 'vd-payment-gateway'), $label),
+                $label,
+                self::CAPABILITY,
+                $this->page_slug($tab),
+                [$this, 'render']
+            );
+            if ($hook && !in_array($hook, $this->hooks, true)) {
+                $this->hooks[] = $hook;
+            }
+        }
+        // URL lama (?page=vd-payment-gateway&tab=...) dialihkan ke submenu yang sesuai.
+        add_action('load-' . $this->hooks[0], [$this, 'redirect_legacy_tab']);
+    }
+
+    public function redirect_legacy_tab()
+    {
+        $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : '';
+        if ($tab === '' || !isset($this->tabs()[$tab]) || $this->page_slug($tab) === self::SLUG) {
+            return;
+        }
+        $args = array_filter(array_diff_key(wp_unslash($_GET), ['page' => 1, 'tab' => 1]), 'is_scalar');
+        wp_safe_redirect($this->url($tab, $args));
+        exit;
     }
 
     private function url($tab, array $extra = [])
     {
-        return add_query_arg(array_merge(['page' => self::SLUG, 'tab' => $tab], $extra), admin_url('admin.php'));
+        // add_query_arg tidak meng-encode; kunci dan nilai di-encode di sini supaya "&" dll. tidak memecah query.
+        $query = ['page' => $this->page_slug($tab)];
+        foreach ($extra as $key => $value) {
+            $query[rawurlencode((string) $key)] = rawurlencode((string) $value);
+        }
+
+        return add_query_arg($query, admin_url('admin.php'));
+    }
+
+    /** Tab yang sedang dibuka, dari slug halaman (atau ?tab= pada halaman induk). */
+    private function current_tab()
+    {
+        $page = isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : self::SLUG;
+        $tabs = $this->tabs();
+        foreach (array_keys($tabs) as $tab) {
+            if ($page !== self::SLUG && $page === $this->page_slug($tab)) {
+                return $tab;
+            }
+        }
+        $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : '';
+
+        return isset($tabs[$tab]) ? $tab : (string) key($tabs);
     }
 
     public function enqueue($hook)
     {
-        if ($hook !== 'toplevel_page_' . self::SLUG) {
+        if (!in_array($hook, $this->hooks, true)) {
             return;
         }
         wp_enqueue_style('vdpg-admin', VDPG_URL . 'assets/css/admin.css', [], VDPG_VERSION);
@@ -162,10 +231,7 @@ class SettingsPage
         }
 
         $gateways = Plugin::instance()->registry()->all();
-        $tab = isset($_GET['tab']) ? sanitize_key(wp_unslash($_GET['tab'])) : '';
-        if ($tab === '' || (!in_array($tab, ['transactions', 'log'], true) && !isset($gateways[$tab]))) {
-            $tab = (string) key($gateways);
-        }
+        $tab = $this->current_tab();
         ?>
         <div class="wrap vdpg-wrap">
             <div class="vdpg-topnav">
@@ -556,8 +622,7 @@ class SettingsPage
             __('Transaksi terbaru dari semua gateway.', 'vd-payment-gateway')
         ); ?>
         <form method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>" class="vdpg-filter" role="search" @submit.prevent="load(1)">
-            <input type="hidden" name="page" value="<?php echo esc_attr(self::SLUG); ?>">
-            <input type="hidden" name="tab" value="transactions">
+            <input type="hidden" name="page" value="<?php echo esc_attr($this->page_slug('transactions')); ?>">
             <label class="screen-reader-text" for="vdpg_tx_search"><?php esc_html_e('Cari invoice atau referensi', 'vd-payment-gateway'); ?></label>
             <input type="search" id="vdpg_tx_search" name="s" maxlength="100" value="<?php echo esc_attr($filters['search']); ?>" placeholder="<?php esc_attr_e('Cari invoice / referensi', 'vd-payment-gateway'); ?>" x-model="filters.search" @input.debounce.400ms="load(1)">
             <label class="screen-reader-text" for="vdpg_tx_status"><?php esc_html_e('Status', 'vd-payment-gateway'); ?></label>

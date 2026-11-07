@@ -168,8 +168,26 @@ try {
     $r = wp_remote_get($url, ['cookies' => $cookies, 'headers' => ['X-WP-Nonce' => $nonce], 'timeout' => 20]);
     ar_check('cookie + nonce benar: 200 tanpa secret', wp_remote_retrieve_response_code($r) === 200 && strpos(wp_remote_retrieve_body($r), $secret) === false, (string) wp_remote_retrieve_response_code($r));
 
-    foreach (['doku', 'duitku', 'transactions', 'log'] as $tab) {
-        $r = wp_remote_get(admin_url('admin.php?page=vd-payment-gateway&tab=' . $tab), ['cookies' => $cookies, 'timeout' => 20]);
+    $menu = wp_remote_retrieve_body(wp_remote_get(admin_url('index.php'), ['cookies' => $cookies, 'timeout' => 20]));
+    $slugs = ['doku' => 'vd-payment-gateway', 'duitku' => 'vd-payment-gateway-duitku', 'midtrans' => 'vd-payment-gateway-midtrans',
+        'transactions' => 'vd-payment-gateway-transactions', 'log' => 'vd-payment-gateway-log'];
+    foreach ($slugs as $tab => $slug) {
+        ar_check("submenu $tab ada di menu admin", strpos($menu, 'admin.php?page=' . $slug . '"') !== false || strpos($menu, 'admin.php?page=' . $slug . "'") !== false);
+    }
+    $r = wp_remote_get(admin_url('admin.php?page=vd-payment-gateway&tab=transactions&status=paid'), ['cookies' => $cookies, 'redirection' => 0, 'timeout' => 20]);
+    $loc = (string) wp_remote_retrieve_header($r, 'location');
+    ar_check('URL lama ?tab=transactions dialihkan ke submenu, filter ikut', wp_remote_retrieve_response_code($r) === 302
+        && strpos($loc, 'page=vd-payment-gateway-transactions') !== false && strpos($loc, 'status=paid') !== false && strpos($loc, 'tab=') === false, $loc);
+    $r = wp_remote_get(admin_url('admin.php?page=vd-payment-gateway&tab=log&x%26evil=1&s=a%20b%26c'), ['cookies' => $cookies, 'redirection' => 0, 'timeout' => 20]);
+    $loc = (string) wp_remote_retrieve_header($r, 'location');
+    ar_check('redirect URL lama meng-encode kunci & nilai (tidak ada parameter sisipan)', strpos($loc, '&evil=') === false && strpos($loc, 'x%26evil=1') !== false && strpos($loc, 's=a%20b%26c') !== false, $loc);
+    $r = wp_remote_get(admin_url('admin.php?page=vd-payment-gateway&tab=doku'), ['cookies' => $cookies, 'redirection' => 0, 'timeout' => 20]);
+    ar_check('URL lama ?tab=doku (tab pertama) tidak dialihkan', wp_remote_retrieve_response_code($r) === 200);
+    $html = wp_remote_retrieve_body(wp_remote_get(admin_url('admin.php?page=vd-payment-gateway-midtrans'), ['cookies' => $cookies, 'timeout' => 20]));
+    ar_check('submenu Midtrans menampilkan pengaturan Midtrans', strpos($html, 'Pengaturan Midtrans') !== false && strpos($html, 'Pengaturan DOKU') === false);
+
+    foreach ($slugs as $tab => $slug) {
+        $r = wp_remote_get(admin_url('admin.php?page=' . $slug), ['cookies' => $cookies, 'timeout' => 20]);
         $html = wp_remote_retrieve_body($r);
         ar_check("halaman tab $tab 200, tanpa secret, Alpine lokal dimuat", wp_remote_retrieve_response_code($r) === 200 && strpos($html, $secret) === false
             && strpos($html, 'vd-payment-gateway/assets/vendor/alpinejs/alpine.min.js') !== false && strpos($html, 'cdn.jsdelivr') === false && strpos($html, 'x-html') === false,
