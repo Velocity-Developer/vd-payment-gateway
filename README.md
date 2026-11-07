@@ -15,11 +15,12 @@ Menu **Payment Gateway → DOKU** di wp-admin:
 Menu **Payment Gateway → Duitku**: Aktifkan, Mode, Kode Merchant, API Key, batas bayar, Return URL bawaan.
 Callback URL dikirim otomatis per transaksi (`/wp-json/vd-pg/v1/notify/duitku`), tidak perlu diisi di dashboard Duitku.
 
-Menu **Payment Gateway → Midtrans**: Aktifkan, Mode, Merchant ID, Client Key, Server Key, batas bayar, dan
+Menu **Payment Gateway → Midtrans**: Aktifkan, Mode, Merchant ID, Client Key, Server Key, Signature Secret Key
+(dashboard baru; bila kosong notifikasi diverifikasi dengan Server Key), batas bayar, dan
 (opsional) daftar metode yang ditampilkan (`enabled_payments`, mis. `bca_va,bni_va,gopay,other_qris`).
 Notification URL (`/wp-json/vd-pg/v1/notify/midtrans`) dikirim otomatis per transaksi lewat header
 `X-Override-Notification`, jadi tidak wajib diisi di dashboard Midtrans. Notifikasi diverifikasi dengan
-`signature_key` (SHA512 order_id + status_code + gross_amount + Server Key). Pemetaan status:
+`signature_key` (SHA512 order_id + status_code + gross_amount + Signature Secret Key atau Server Key). Pemetaan status:
 `settlement` / `capture`+`accept` → lunas, `capture`+`challenge` / `pending` / `deny` → menunggu,
 `expire` → kedaluwarsa, `cancel` / `failure` → gagal, `refund` → refund, `partial_refund` → tetap lunas (payload tersimpan).
 Invoice Midtrans maksimal 50 karakter (huruf, angka, `- _ ~ .`).

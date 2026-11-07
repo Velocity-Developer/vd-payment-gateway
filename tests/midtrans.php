@@ -98,6 +98,14 @@ mcheck('expire → expired', $notify($payload($inv3, 'expire', '20000.00')) === 
 mcheck('invoice tak dikenal → 404', $notify($payload("MT-$run-X", 'settlement', '1.00')) === 404);
 mcheck('body bukan JSON → 400', (int) wp_remote_retrieve_response_code(wp_remote_post(rest_url('vd-pg/v1/notify/midtrans'), ['body' => 'x=1', 'timeout' => 20])) === 400);
 
+$opt = get_option('vdpg_midtrans'); $opt['signature_key'] = 'SIG-SECRET-xyz'; update_option('vdpg_midtrans', $opt);
+$inv5 = "MT-$run-5";
+(new \VdPaymentGateway\Transaction\TransactionRepository())->upsert_pending('midtrans', $inv5, ['source' => 'uji', 'ref_id' => '5', 'amount' => 15000]);
+$p5 = $payload($inv5, 'settlement', '15000.00'); $p5['signature_key'] = hash('sha512', $inv5 . '200' . '15000.00' . 'SIG-SECRET-xyz');
+mcheck('notifikasi bertanda Signature Secret Key diterima', $notify($p5) === 200 && $st($inv5) === 'paid');
+$p6 = $payload("MT-$run-6", 'settlement', '1.00'); $p6['signature_key'] = hash('sha512', "MT-$run-6" . '200' . '1.00' . 'kunci-lain');
+mcheck('signature dengan kunci lain tetap ditolak', $notify($p6) === 401);
+
 echo "== Midtrans: cek status\n";
 $inv4 = "MT-$run-4";
 (new \VdPaymentGateway\Transaction\TransactionRepository())->upsert_pending('midtrans', $inv4, ['source' => 'uji', 'ref_id' => '4', 'amount' => 30000]);
@@ -118,7 +126,7 @@ $logf = \VdPaymentGateway\Logger::files();
 $log = $logf ? (string) file_get_contents($logf[0]) : '';
 mcheck('server key & header Authorization tidak tertulis di log', strpos($log, $skey) === false && strpos($log, base64_encode($skey . ':')) === false && stripos($log, '"authorization"') === false && strpos($log, 'Basi') === false);
 $pub = \VdPaymentGateway\Admin\SettingsPage::public_settings(vd_pg_gateway('midtrans'));
-mcheck('server key tidak dikirim ke browser', strpos(wp_json_encode($pub), $skey) === false);
+mcheck('server key & signature key tidak dikirim ke browser', strpos(wp_json_encode($pub), $skey) === false && strpos(wp_json_encode($pub), 'SIG-SECRET-xyz') === false);
 update_option('vdpg_midtrans', ['enabled' => '1', 'mode' => 'sandbox', 'server_key' => '']);
 mcheck('tanpa server key → tidak aktif', !vd_pg_gateway('midtrans')->is_active());
 

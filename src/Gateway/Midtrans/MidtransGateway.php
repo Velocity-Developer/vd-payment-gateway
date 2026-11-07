@@ -41,6 +41,7 @@ class MidtransGateway implements GatewayInterface
             'merchant_id' => '',
             'client_key' => '',
             'server_key' => '',
+            'signature_key' => '',
             'expiry' => 60,
             'enabled_payments' => '',
         ]);
@@ -98,6 +99,11 @@ class MidtransGateway implements GatewayInterface
                 'type' => 'secret',
                 'label' => 'Server Key',
                 'hint' => __('Kosongkan bila tidak ingin mengubah Server Key yang tersimpan.', 'vd-payment-gateway'),
+            ],
+            'signature_key' => [
+                'type' => 'secret',
+                'label' => 'Signature Secret Key',
+                'hint' => __('Dashboard Midtrans > Settings > Access Keys (akun baru). Untuk verifikasi notifikasi; bila kosong dipakai Server Key. Kosongkan bila tidak ingin mengubah nilai tersimpan.', 'vd-payment-gateway'),
             ],
             'expiry' => [
                 'type' => 'number',
@@ -320,16 +326,31 @@ class MidtransGateway implements GatewayInterface
         if ($order_id === '' || $status_code === '' || $gross_amount === '' || $signature === '') {
             return new \WP_Error('vdpg_midtrans_params', 'Parameter tidak lengkap', ['status' => 400]);
         }
-        if (!hash_equals($this->signature($order_id, $status_code, $gross_amount), $signature)) {
+        $valid = false;
+        foreach ($this->signature_secrets() as $secret) {
+            if (hash_equals($this->signature($order_id, $status_code, $gross_amount, $secret), $signature)) {
+                $valid = true;
+                break;
+            }
+        }
+        if (!$valid) {
             return new \WP_Error('vdpg_midtrans_signature', 'Signature tidak valid', ['status' => 401]);
         }
 
         return $this->normalize_payload($payload);
     }
 
-    public function signature($order_id, $status_code, $gross_amount)
+    /** Dashboard Midtrans baru punya Signature Secret Key terpisah; akun lama memakai Server Key. */
+    private function signature_secrets()
     {
-        return hash('sha512', $order_id . $status_code . $gross_amount . (string) $this->options()['server_key']);
+        $options = $this->options();
+
+        return array_values(array_unique(array_filter([(string) $options['signature_key'], (string) $options['server_key']], 'strlen')));
+    }
+
+    public function signature($order_id, $status_code, $gross_amount, $secret = null)
+    {
+        return hash('sha512', $order_id . $status_code . $gross_amount . ($secret ?? (string) $this->options()['server_key']));
     }
 
     /** Ubah notifikasi / respons cek status Midtrans menjadi format seragam. */
